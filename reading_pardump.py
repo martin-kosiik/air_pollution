@@ -4,8 +4,9 @@ import numpy as np
 import pandas as pd
 import datetime
 import xarray as xr
-
-
+import rasterio
+import rioxarray
+import matplotlib.pyplot as plt
 #!pip install git+https://github.com/noaa-oar-arl/monetio.git
 
 os.chdir(r'C:\Users\marti\Dropbox\research_projects\air_pollution')
@@ -14,12 +15,76 @@ os.chdir(r'C:\Users\marti\Dropbox\research_projects\air_pollution')
 import monetio as mio
 
 hysplitfile = 'C:/HYSPLIT/working/cdump'
-hysplitfile = 'C:/HYSPLIT/working/SRM_cdump_new'
+hysplitfile = 'C:/HYSPLIT/working/test_exec_cdump_new_2'
 
 hysplitfile = 'C:/HYSPLIT/working/SRM_source_conc.bin'
 one_source  = 'C:/HYSPLIT/working/conc_dump_grid/SRM_source_conc_x-86_y41.bin'
 
 
+
+
+def get_latlongrid(dset, xindx, yindx):
+    """
+    INPUTS
+    dset : xarray data set from ModelBin class
+    xindx : list of integers
+    yindx : list of integers
+    RETURNS
+    mgrid : output of numpy meshgrid function.
+            Two 2d arrays of latitude, longitude.
+    """
+    llcrnr_lat = dset.attrs["Concentration Grid"]["llcrnr latitude"]
+    llcrnr_lon = dset.attrs["Concentration Grid"]["llcrnr longitude"]
+    nlat = dset.attrs["Concentration Grid"]["Number Lat Points"]
+    nlon = dset.attrs["Concentration Grid"]["Number Lon Points"]
+    dlat = dset.attrs["Concentration Grid"]["Latitude Spacing"]
+    dlon = dset.attrs["Concentration Grid"]["Longitude Spacing"]
+
+    lat = np.arange(llcrnr_lat, llcrnr_lat + nlat * dlat, dlat)
+    lon = np.arange(llcrnr_lon, llcrnr_lon + nlon * dlon, dlon)
+    print(nlat, nlon, dlat, dlon)
+    print("lon shape", lon.shape)
+    print("lat shape", lat.shape)
+    #print(lat)
+    #print(lon)
+    lonlist = [lon[x - 1] for x in xindx]
+    latlist = [lat[x - 1] for x in yindx]
+    mgrid = np.meshgrid(lonlist, latlist)
+    return mgrid
+
+def get_latlongrid_flat(dset, xindx, yindx):
+    """
+    INPUTS
+    dset : xarray data set from ModelBin class
+    xindx : list of integers
+    yindx : list of integers
+    RETURNS
+    mgrid : output of numpy meshgrid function.
+            Two 2d arrays of latitude, longitude.
+    """
+    llcrnr_lat = dset.attrs["Concentration Grid"]["llcrnr latitude"]
+    llcrnr_lon = dset.attrs["Concentration Grid"]["llcrnr longitude"]
+    nlat = dset.attrs["Concentration Grid"]["Number Lat Points"]
+    nlon = dset.attrs["Concentration Grid"]["Number Lon Points"]
+    dlat = dset.attrs["Concentration Grid"]["Latitude Spacing"]
+    dlon = dset.attrs["Concentration Grid"]["Longitude Spacing"]
+
+    lat = np.arange(llcrnr_lat, llcrnr_lat + nlat * dlat, dlat)
+    lon = np.arange(llcrnr_lon, llcrnr_lon + nlon * dlon, dlon)
+    print(nlat, nlon, dlat, dlon)
+    print("lon shape", lon.shape)
+    print("lat shape", lat.shape)
+    #print(lat)
+    #print(lon)
+    lonlist = [lon[x - 1] for x in xindx]
+    latlist = [lat[x - 1] for x in yindx]
+    return (lonlist, latlist)
+
+
+
+my_modelbin_2 = mio.models.hysplit.ModelBin(hysplitfile, verbose=False)
+
+my_modelbin = mio.models.hysplit.ModelBin(hysplitfile, verbose=False)
 
 my_modelbin = mio.models.hysplit.ModelBin(hysplitfile, verbose=False)
 
@@ -40,6 +105,7 @@ my_modelbin.levels
 my_modelbin.verbose
 
 
+my_modelbin.dset
 
 
 dir(my_modelbin.dset.data_vars)
@@ -165,7 +231,6 @@ conc_xarrays_list = [read_conc_file(x) for x in conc_file_path_list]
 
 
 
-conc_xarray_final.sel(start_date = datetime.datetime(2014, start_month, start_day, hour=start_hour))
 
 conc_xarray_final = xr.concat(conc_xarrays_list, pd.Index([datetime.datetime(2014, start_month, start_day, hour=start_hour),
                                                             datetime.datetime(2013, start_month, start_day, hour=start_hour),
@@ -173,94 +238,83 @@ conc_xarray_final = xr.concat(conc_xarrays_list, pd.Index([datetime.datetime(201
                                                             datetime.datetime(2017, start_month, start_day, hour=start_hour)], name="start_date"))
 
 
-relative_times_array = (conc_xarrays_list[0].time.values - conc_xarrays_list[0].time.values[0]).astype('timedelta64[h]').astype(int)
+#relative_times_array = (conc_xarrays_list[0].time.values - conc_xarrays_list[0].time.values[0]).astype('timedelta64[h]').astype(int)
 
-
-conc_xarrays_list[0] = conc_xarrays_list[0].assign_coords(
-        relative_time=(('time'), relative_times_array )
-).set_index(time = ['relative_time'])
-
-
-
-
-conc_xarrays_list[0].expand_dims({'new_start_time': 1}).assign_coords(new_start_time= (('new_start_time'), conc_xarrays_list[0].time.values ))
-xr.concat()
-
-conc_xarrays_list[0].assign_coords({'new_start_time': conc_xarrays_list[0].time.values[0]})
+#conc_xarrays_list[0] = conc_xarrays_list[0].assign_coords(
+#        relative_time=(('time'), relative_times_array )
+#).set_index(time = ['relative_time'])
 
 
 
-mgrid = get_latlongrid(conc_xarray_final, conc_xarray_final.x.values, conc_xarray_final.y.values)
-#newhxr = newhxr.drop("longitude")
-#newhxr = newhxr.drop("latitude")
-conc_xarray_final = conc_xarray_final.assign_coords(latitude=(("y", "x"), mgrid[1]))
-conc_xarray_final = conc_xarray_final.assign_coords(longitude=(("y", "x"), mgrid[0]))
+
+#conc_xarrays_list[0].expand_dims({'new_start_time': 1}).assign_coords(new_start_time= (('new_start_time'), conc_xarrays_list[0].time.values ))
+
+
+
+
+llcrnr_lat = dset.attrs["Concentration Grid"]["llcrnr latitude"]
+llcrnr_lon = dset.attrs["Concentration Grid"]["llcrnr longitude"]
+nlat = dset.attrs["Concentration Grid"]["Number Lat Points"]
+nlon = dset.attrs["Concentration Grid"]["Number Lon Points"]
+dlat = dset.attrs["Concentration Grid"]["Latitude Spacing"]
+    dlon = dset.attrs["Concentration Grid"]["Longitude Spacing"]
+
+    lat = np.arange(llcrnr_lat, llcrnr_lat + nlat * dlat, dlat)
+    lon = np.arange(llcrnr_lon, llcrnr_lon + nlon * dlon, dlon)
+
+
+lon_vals, lat_vals = get_latlongrid_flat(conc_xarray_final, conc_xarray_final.x.values, conc_xarray_final.y.values)
+
+conc_xarray_final = conc_xarray_final.assign_coords(
+            lon=(('x'), lon_vals ),
+            lat=(('y'), lat_vals )
+    ).set_index(x = ['lon'], y = ['lat'])
+
+
+#mgrid = get_latlongrid(conc_xarray_final, conc_xarray_final.x.values, conc_xarray_final.y.values)
+#conc_xarray_final = conc_xarray_final.assign_coords(latitude=(("y", "x"), mgrid[1]))
+#conc_xarray_final = conc_xarray_final.assign_coords(longitude=(("y", "x"), mgrid[0]))
 
 # https://github.com/noaa-oar-arl/monetio/blob/master/monetio/models/hysplit.py
-(conc_xarray_final.time[1] - conc_xarray_final.start_date[1]).values.astype('timedelta64[h]')
 
-conc_xarray_final.time[1].values.year
-
-years_array = conc_xarray_final.time.values.astype('datetime64[Y]').astype(int) + 1970
+#years_array = conc_xarray_final.time.values.astype('datetime64[Y]').astype(int) + 1970
 
 
-start_datetime_array = [datetime.datetime(x, start_month, start_day, hour=start_hour) for x in years_array]
-start_datetime_array = np.array(start_datetime_array)
+#start_datetime_array = [datetime.datetime(x, start_month, start_day, hour=start_hour) for x in years_array]
+#start_datetime_array = np.array(start_datetime_array)
 
-
-(conc_xarray_final.time - conc_xarray_final.start_date).astype('timedelta64[h]')
-
-conc_xarray_final.sel(start_date = '2016-10-01T00:00:00.000000000', time='2013-10-01T00:00:00.000000000')
-
-
-(conc_xarray_final.time - start_datetime_array.astype('datetime64')).values.astype('timedelta64[h]').astype(int)
-conc_xarray_final = conc_xarray_final.assign_coords(
-        relative_time=(('time'), (conc_xarray_final.time - start_datetime_array.astype('datetime64')).values.astype('timedelta64[h]').astype(int))
-)
+conc_xarray_final = conc_xarray_final.rio.set_crs(rasterio.crs.CRS.from_epsg(4326), inplace = False) #
 
 
 
 
-conc_xarray_final = conc_xarray_final.assign_coords(
-        relative_time=(('time'), (conc_xarray_final['time'] - conc_xarray_final['start_date']).astype('timedelta64[h]').astype(int) )
-)
 
-conc_xarray_final.time - np.repeat(conc_xarray_final.start_date.values, 6)
 
-conc_xarray_final.start_date.values
 
-conc_xarray_final = conc_xarray_final.assign_coords(
-        {'relative_time':conc_xarray_final.time - conc_xarray_final.start_date}
-)
 
-np.repeat(conc_xarray_final.start_date.values, 6)
+
 
 
 
 time_period = 0
 
-conc_xarray_final.assign_coords({"relative_time": (((da.lon + 180) % 360) - 180)})
-conc_xarray_final.sel(source='0001')
-
-conc_xarray_final.sel(relative_time=43200000000000).sel(source='0001').mean(dims='').plot(x="longitude", y="latitude")
 
 
-conc_xarray_final_zero = conc_xarray_final.fillna(0)
-
-conc_xarray_final.where(conc_xarray_final.relative_time==0, drop=True)
-
-conc_xarray_final.set_index(relative_time = ['relative_time']).sel(source='0001').sel(relative_time=0).mean(dim='start_date', skipna=True).mean(dim='time', skipna=True).plot(x="longitude", y="latitude")
+#conc_xarray_final_zero = conc_xarray_final.fillna(0)
 
 
-conc_xarray_final.sel(source='0001', time=12).mean(dim='start_date', skipna=True).plot(x="longitude", y="latitude")
+#conc_xarray_final.set_index(relative_time = ['relative_time']).sel(source='0001').sel(relative_time=0).mean(dim='start_date', skipna=True).mean(dim='time', skipna=True).plot(x="longitude", y="latitude")
 
 
-source_id = '0072'
-
-conc_xarray_final.sel(source=source_id, time=slice(1, None)).fillna(0).mean(dim='start_date').mean(dim='time').plot(x="longitude", y="latitude")
+#conc_xarray_final.sel(source='0001', time=12).mean(dim='start_date', skipna=True).plot(x="longitude", y="latitude")
 
 
-conc_xarray_final.sel(source=source_id, time=slice(1, None)).isel(start_date=0).fillna(0).mean(dim='time').plot(x="longitude", y="latitude")
+source_id = '0023'
+
+np.log(conc_xarray_final.sel(source=source_id, time=slice(0, None)).fillna(0).mean(dim='start_date').mean(dim='time')).plot()
+
+
+conc_xarray_final.sel(source=source_id, time=slice(1, None)).isel(start_date=0).fillna(0).mean(dim='time').plot()
 
 
 conc_xarray_final.sel(source=source_id, time=slice(1, None)).isel(start_date=1).fillna(0).mean(dim='time').plot(x="longitude", y="latitude")
@@ -272,80 +326,273 @@ conc_xarray_final.sel(source=source_id, time=slice(1, None)).isel(start_date=3).
 
 
 
+population_raster = rioxarray.open_rasterio( 'data\\population_grid\\india-spatial-india-census-2011-population-grid\\india_pop\\w001001.adf')
+population_raster = rioxarray.open_rasterio(r'data\population_grid\gpw_v4_population_density_adjusted_to_2015_unwpp_country_totals_rev11_2020_2pt5_min.tif')
+population_raster = rioxarray.open_rasterio(r'data\population_grid\ppp_2018_1km_Aggregated.tif')
+
+population_raster.plot()
+
+# look at what exact type of resampling are you using
+pop_raster_matched = population_raster.rio.reproject_match(conc_xarray_final)
+pop_raster_matched.plot()
+
+pop_raster_matched_masked = pop_raster_matched.where(pop_raster_matched >-0.1)
+pop_raster_matched_masked.plot()
+np.log(pop_raster_matched_masked).plot()
+
+
+conc_xarray_final_masked = conc_xarray_final.where(pop_raster_matched >-0.1)
+
+conc_xarray_final_masked.sel(source=source_id, time=slice(1, None)).fillna(0).mean(dim='start_date').mean(dim='time').plot()
+
+
+pop_exposure_matrix = conc_xarray_final_masked.fillna(0).mean(dim='start_date').mean(dim='time').dot(pop_raster_matched_masked.fillna(0), dims = ['x', 'y'])
+
+
+
+pop_exposure_matrix.isel(band=0).set_index(source=['lon_source', 'lat_source'],).unstack("source").plot(x='lon_source', y='lat_source')
+
+pop_exposure_matrix.isel(band=0).plot.hist()
+
+pop_exposure_by_lonlat = pop_exposure_matrix.isel(band=0).set_index(source=['lon_source', 'lat_source'],).unstack("source")
+
+import cartopy
+
+import cartopy.crs as ccrs
+
+
+
+
+import cartopy.io.img_tiles as cimgt
+
+fig = plt.figure()
+
+# create geo axes
+projection = ccrs.PlateCarree()
+geo_axes = plt.subplot(projection=projection)
+
+# add open street map background
+# when commenting the two following lines, the data array is plotted correctly
+osm_background = cimgt.OSM()
+geo_axes.add_image(osm_background, 10)
+#projection.states()
+# plot dataset
+xr.plot.imshow(
+    darray=pop_exposure_by_lonlat,
+    x="lon_source",
+    y="lat_source",
+    ax=geo_axes,
+    transform=projection,
+    zorder=10
+)
+
+# show plot
+plt.show()
+
+
+
+
+
+
+
 
 # Now we have to do resampling of the rasters to allign the population and pollution exposure rasters
 # https://pygis.io/docs/e_raster_resample.html
 # we probably want to use average resampling
 # https://rasterio.readthedocs.io/en/latest/api/rasterio.enums.html
 
+lon_vals, lat_vals = get_latlongrid_flat(conc_xarray_final, conc_xarray_final.x.values, conc_xarray_final.y.values)
+
+
+new_xarray = conc_xarray_final.sel(source=source_id, time=slice(1, None)).isel(start_date=3).fillna(0).mean(dim='time')
+new_xarray.attrs = conc_xarray_final.attrs
+
+lon_vals, lat_vals = get_latlongrid_flat(new_xarray, new_xarray.x.values, new_xarray.y.values)
+
+len(new_xarray.x.values)
+len(lon_vals)
+len(lat_vals)
+len(new_xarray.y.values)
+
+new_xarray = new_xarray.assign_coords(
+            lon=(('x'), lon_vals ),
+            lat=(('y'), lat_vals )
+    ).set_index(x = ['lon'], y = ['lat'])
+
+
+
+new_xarray
+lon_vals
+
+
+
+new_xarray = new_xarray.rio.set_crs(rasterio.crs.CRS.from_epsg(4326), inplace = False) #
+
+get_latlongrid_flat()
+
+np.log(new_xarray).plot()
+
+new_xarray.rio.crs
+
+new_xarray.rio.to_raster("data/planet_scope_green.tif")
+
+!rio info data/planet_scope_green.tif
 
 
 
 
 
+new_xarray.rio.bounds()
+
+set_crs
+rasterio.crs.CRS.from_epsg(4326)
+new_xarray.rio.height
+new_xarray.rio.width
+new_xarray.rio._x_dim
+new_xarray.rio.set_spatial_dims(x_dim='longitude', y_dim='latitude', inplace=False)
+
+new_xarray.rio.transform()
+
+new_xarray.rio.grid_mapping
+new_xarray.encoding
+rds.rio.crs
+rds.rio.bounds()
+rds.rio.grid_mapping
+rds.rio.height
+rds.rio.width
+rds.rio._x_dim
+set_spatial_dims()
+rds.rio.transform()
+rds.encoding
+
+
+def print_raster(raster):
+    print(
+        f"shape: {raster.rio.shape}\n"
+        f"resolution: {raster.rio.resolution()}\n"
+        f"bounds: {raster.rio.bounds()}\n"
+        f"sum: {raster.sum().item()}\n"
+        f"CRS: {raster.rio.crs}\n"
+    )
+
+print_raster(rds)
+
+print_raster(new_xarray)
+
+
+rds_repr_match = rds.rio.reproject_match(new_xarray)
+
+print_raster(rds_repr_match)
+
+rds_repr_match.plot()
+
+rds_repr_match_masked = rds_repr_match.where(rds_repr_match >0)
+
+np.log(rds_repr_match_masked).plot()
+
+
+new_xarray_masked = new_xarray.where(rds_repr_match >0)
+
+new_xarray_masked.plot()
+
+rds_repr_match_masked
+
+new_xarray_masked.fillna(0).dot(rds_repr_match_masked.fillna(0), dims = ['x', 'y'])
 
 
 
+crs = CRS.from_string ('+proj=lcc +lat_1=33 +lat_2=45 +lat_0=40 +lon_0=-97 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs')
 
 
-conc_xarray_final.sel(source='0072', time=60).fillna(0).mean(dim='start_date').plot(x="longitude", y="latitude")
+rds = rioxarray.open_rasterio(
+    'data\\population_grid\\india-spatial-india-census-2011-population-grid\\india_pop\\w001001.adf',
+)
+rds
+
+rds.isel(x =1)
+rds.rio.set_attrs({'_FillValue': 0})
+
+rds = rds.rio.set_nodata(0)
+rds.rio.nodata
+rds.rio.encoded_nodata
+rds.rio.write_nodata(False).isel(x=0)
 
 
-conc_xarray_final.sel(source='0001').mean(dim='time', skipna=True).mean(dim='start_date', skipna=True).plot(x="longitude", y="latitude")
-
-conc_xarray_final.sel(source='0079').mean(dim='time', skipna=True).mean(dim='start_date', skipna=True).plot(x="longitude", y="latitude")
+conc_xarray_final.where(conc_xarray_final == np.nan, other=0)
 
 
+rds[rds < 0]
+rds.where(rds < 0, other=0)
 
-conc_xarray_final_zero.sel(source='0001').mean(dim='time').mean(dim='start_date').plot(x="longitude", y="latitude")
+dir(rds.rio)
 
-
-
-my_modelbin.dset.data_vars['0001'][time_period][0].plot(x="longitude", y="latitude")
-
-my_modelbin.dset.data_vars['0079'][time_period][0].plot(x="longitude", y="latitude")
+rds.rio.estimate_utm_crs()
 
 
+population_raster = rasterio.open('data\\population_grid\\india-spatial-india-census-2011-population-grid\\india_pop\\w001001.adf')
 
+population_raster.nodata
+population_raster.nodatavals
+population_raster.profile
+population_raster.dataset_mask()
+population_raster.colorinterp
+
+
+conc_xarray_final
+conc_xarray_final.sel(source=source_id, time=slice(1, None)).isel(start_date=3).fillna(0).mean(dim='time').rio.crs
+plot(population_raster)
+
+rasterio.CRS.from_epsg(4326)
+
+
+from matplotlib import pyplot
+population_raster.read(1)
+population_raster.bounds
+population_raster.crs
+
+0.008333333333*6
+
+population_raster.res
+
+pyplot.imshow(population_raster.read(1), cmap='viridis')
+pyplot.show()
+
+from rasterio.plot import show_hist
+from rasterio.windows import Window
+
+
+crop_window = Window.from_slices((0, 1500), (0, 1500))
+
+
+show_hist( population_raster, bins=50, lw=0.0, stacked=False, alpha=0.3,  histtype='stepfilled', title="Histogram")
+
+with rasterio.open('data\\population_grid\\india-spatial-india-census-2011-population-grid\\india_pop\\w001001.adf') as src:
+        pop_raster = src.read(1, window=crop_window)
+
+pop_raster
+
+pyplot.imshow(pop_raster, cmap='viridis')
+
+pop_raster
+
+from rasterio.plot import show
+show(population_raster)
+show(pop_raster)
+
+
+show_hist( pop_raster, bins=50, lw=0.0, stacked=False, alpha=0.3,  histtype='stepfilled', title="Histogram")
 
 
 conc_xarray_final
 
 
 
+!pip install rioxarray
+
+import rioxarray
 
 
 
-
-
-def get_latlongrid(dset, xindx, yindx):
-    """
-    INPUTS
-    dset : xarray data set from ModelBin class
-    xindx : list of integers
-    yindx : list of integers
-    RETURNS
-    mgrid : output of numpy meshgrid function.
-            Two 2d arrays of latitude, longitude.
-    """
-    llcrnr_lat = dset.attrs["Concentration Grid"]["llcrnr latitude"]
-    llcrnr_lon = dset.attrs["Concentration Grid"]["llcrnr longitude"]
-    nlat = dset.attrs["Concentration Grid"]["Number Lat Points"]
-    nlon = dset.attrs["Concentration Grid"]["Number Lon Points"]
-    dlat = dset.attrs["Concentration Grid"]["Latitude Spacing"]
-    dlon = dset.attrs["Concentration Grid"]["Longitude Spacing"]
-
-    lat = np.arange(llcrnr_lat, llcrnr_lat + nlat * dlat, dlat)
-    lon = np.arange(llcrnr_lon, llcrnr_lon + nlon * dlon, dlon)
-    print(nlat, nlon, dlat, dlon)
-    print("lon shape", lon.shape)
-    print("lat shape", lat.shape)
-    print(lat)
-    print(lon)
-    lonlist = [lon[x - 1] for x in xindx]
-    latlist = [lat[x - 1] for x in yindx]
-    mgrid = np.meshgrid(lonlist, latlist)
-    return mgrid
 
 
 
