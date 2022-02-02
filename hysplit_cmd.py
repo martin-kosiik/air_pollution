@@ -68,21 +68,15 @@ echo  3                      >>CONTROL
 echo  27.0 73.5 10.0         >>CONTROL
 echo  32.0 78.5 10.0         >>CONTROL
 echo  27.5 74.0 10.0         >>CONTROL
-echo 72                      >>CONTROL
+echo 96                      >>CONTROL
 echo 0                       >>CONTROL
 echo 10000.0                 >>CONTROL
-echo 4                       >>CONTROL
-echo C:/Users/marti/Dropbox/research_projects/air_pollution/met/  >>CONTROL
-echo RP201410.gbl           >>CONTROL
-echo C:/Users/marti/Dropbox/research_projects/air_pollution/met/  >>CONTROL
-echo RP201310.gbl           >>CONTROL
-echo C:/Users/marti/Dropbox/research_projects/air_pollution/met/  >>CONTROL
-echo RP201610.gbl           >>CONTROL
-echo C:/Users/marti/Dropbox/research_projects/air_pollution/met/  >>CONTROL
-echo RP201710.gbl           >>CONTROL
+echo 1                       >>CONTROL
+echo C:/HYSPLIT/working/met_files/  >>CONTROL
+echo RP20{source_year}{source_month}.gbl   >>CONTROL
 echo 1                      >>CONTROL
 echo TEST                   >>CONTROL
-echo 1.0                    >>CONTROL
+echo 100000.0               >>CONTROL
 echo 1.0                    >>CONTROL
 echo 00 00 00 00 00         >>CONTROL
 echo 1                      >>CONTROL
@@ -132,7 +126,7 @@ subprocess.call([r'C:\Users\marti\Dropbox\research_projects\air_pollution\my_hys
 
 
 def run_hysplit(source_year='14', source_month = '10', source_day = '01', source_hour = '00',
-                conc_file_name_prefix = 'cdump_'):
+                conc_file_name_prefix = 'cdumps\cdump_'):
 
     final_file_name = conc_file_name_prefix + source_year + source_month + source_day + source_hour
     params_dict = {'source_year': source_year, 'source_month': source_month, 'source_day': source_day, 'source_hour': source_hour,
@@ -151,9 +145,13 @@ def run_hysplit(source_year='14', source_month = '10', source_day = '01', source
 
 
 year_list = ['13', '14', '16', '17']
+year_list = [ '14']
 
+len(year_list)
+year_list = ['06', '07', '08', '09', '10', '11', '12', '15', '16', '17']
 
 for year in year_list:
+    print(year)
     run_hysplit(source_year = year)
 
 
