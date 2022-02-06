@@ -14,11 +14,10 @@ os.chdir(r'C:\Users\marti\Dropbox\research_projects\air_pollution')
 
 import monetio as mio
 
-hysplitfile = 'C:/HYSPLIT/working/cdump'
-hysplitfile = 'C:/HYSPLIT/working/test_exec_cdump_new_2'
+hysplitfile = 'C:/HYSPLIT/working/cdumps/cdump_06100100'
 
-hysplitfile = 'C:/HYSPLIT/working/SRM_source_conc.bin'
-one_source  = 'C:/HYSPLIT/working/conc_dump_grid/SRM_source_conc_x-86_y41.bin'
+#hysplitfile = 'C:/HYSPLIT/working/SRM_source_conc.bin'
+#one_source  = 'C:/HYSPLIT/working/conc_dump_grid/SRM_source_conc_x-86_y41.bin'
 
 
 
@@ -82,10 +81,6 @@ def get_latlongrid_flat(dset, xindx, yindx):
 
 
 
-my_modelbin_2 = mio.models.hysplit.ModelBin(hysplitfile, verbose=False)
-
-my_modelbin = mio.models.hysplit.ModelBin(hysplitfile, verbose=False)
-
 my_modelbin = mio.models.hysplit.ModelBin(hysplitfile, verbose=False)
 
 my_modelbin.atthash['Starting Locations']
@@ -93,24 +88,13 @@ my_modelbin.atthash
 my_modelbin.nonzeroconcdates
 my_modelbin.dset
 
-my_modelbin.slat
-my_modelbin.sht
-my_modelbin.slon
-my_modelbin.llcrnr_lon
-my_modelbin.nlon
-my_modelbin.nlat
-my_modelbin.dlat
-my_modelbin.dlon
-my_modelbin.levels
-my_modelbin.verbose
 
 
-my_modelbin.dset
 
 
 dir(my_modelbin.dset.data_vars)
 
-time_period = 5
+time_period = 0
 
 my_modelbin.dset.data_vars['006F'][time_period][0].plot(x="longitude", y="latitude")
 
@@ -125,12 +109,10 @@ all_source_xarray = my_modelbin.dset.to_array(dim='source')
 
 sources_hexdec_index = list(my_modelbin.dset.data_vars.keys())
 
-sources_hexdec_index
 
 int(sources_hexdec_index[60], base=16)
 
 sources_dec_index = [int(x, base=16) for x in sources_hexdec_index]
-sources_dec_index
 
 with open('C:/HYSPLIT/working/CONTROL') as f:
     lines = f.readlines()
@@ -181,23 +163,6 @@ start_date
 
 
 
-conc_file_path_list[1]
-
-
-def read_conc_file(conc_file_path):
-    hysplit_model = mio.models.hysplit.ModelBin(conc_file_path, verbose=False)
-    all_source_xarray = hysplit_model.dset.to_array(dim='source')
-    all_source_xarray = all_source_xarray.isel(z=0)
-    all_source_xarray = all_source_xarray.assign_coords(
-            lon_source=('source', sources_coords_df.loc[all_source_xarray['source']].lon_source),
-            lat_source=('source', sources_coords_df.loc[all_source_xarray['source']].lat_source)
-    )
-    all_source_xarray = all_source_xarray.drop("longitude")
-    all_source_xarray = all_source_xarray.drop("latitude")
-
-    return all_source_xarray
-
-
 
 
 
@@ -218,25 +183,33 @@ def read_conc_file(conc_file_path):
     return all_source_xarray
 
 
-
+year_list = ['06', '07', '08', '09', '10', '11', '12', '15', '16', '17']
+file_name_list = ['C:/HYSPLIT/working/cdumps/cdump_' + year + '10' + '01' + '00' for year in year_list]
 
 # first is 2014
-conc_file_path_list = ['', '_2013', '_2016', '_2017']
-conc_file_path_list = ['C:/HYSPLIT/working/cdump' + x for x in conc_file_path_list]
-conc_file_path_list
+#conc_file_path_list = ['', '_2013', '_2016', '_2017']
+#conc_file_path_list = ['C:/HYSPLIT/working/cdump' + x for x in conc_file_path_list]
+#conc_file_path_list
 
 
 
-conc_xarrays_list = [read_conc_file(x) for x in conc_file_path_list]
+conc_xarrays_list = [read_conc_file(x) for x in file_name_list]
 
 
+start_year_list = [int('20'+year) for year in year_list]
+start_date_list = [datetime.datetime(year, start_month, start_day, hour=start_hour) for year in start_year_list]
 
 
-conc_xarray_final = xr.concat(conc_xarrays_list, pd.Index([datetime.datetime(2014, start_month, start_day, hour=start_hour),
-                                                            datetime.datetime(2013, start_month, start_day, hour=start_hour),
-                                                            datetime.datetime(2016, start_month, start_day, hour=start_hour),
-                                                            datetime.datetime(2017, start_month, start_day, hour=start_hour)], name="start_date"))
+conc_xarray_final = xr.concat(conc_xarrays_list, pd.Index(start_date_list, name="start_date"))
 
+del conc_xarrays_list
+import gc
+gc.collect()
+
+
+import sys
+# in GB
+sys.getsizeof(conc_xarray_final)/1_000_000
 
 #relative_times_array = (conc_xarrays_list[0].time.values - conc_xarrays_list[0].time.values[0]).astype('timedelta64[h]').astype(int)
 
@@ -250,17 +223,6 @@ conc_xarray_final = xr.concat(conc_xarrays_list, pd.Index([datetime.datetime(201
 #conc_xarrays_list[0].expand_dims({'new_start_time': 1}).assign_coords(new_start_time= (('new_start_time'), conc_xarrays_list[0].time.values ))
 
 
-
-
-llcrnr_lat = dset.attrs["Concentration Grid"]["llcrnr latitude"]
-llcrnr_lon = dset.attrs["Concentration Grid"]["llcrnr longitude"]
-nlat = dset.attrs["Concentration Grid"]["Number Lat Points"]
-nlon = dset.attrs["Concentration Grid"]["Number Lon Points"]
-dlat = dset.attrs["Concentration Grid"]["Latitude Spacing"]
-    dlon = dset.attrs["Concentration Grid"]["Longitude Spacing"]
-
-    lat = np.arange(llcrnr_lat, llcrnr_lat + nlat * dlat, dlat)
-    lon = np.arange(llcrnr_lon, llcrnr_lon + nlon * dlon, dlon)
 
 
 lon_vals, lat_vals = get_latlongrid_flat(conc_xarray_final, conc_xarray_final.x.values, conc_xarray_final.y.values)
@@ -283,10 +245,13 @@ conc_xarray_final = conc_xarray_final.assign_coords(
 #start_datetime_array = [datetime.datetime(x, start_month, start_day, hour=start_hour) for x in years_array]
 #start_datetime_array = np.array(start_datetime_array)
 
+conc_xarray_final = conc_xarray_final.sel(y=slice(15, 35), x=slice(67,85))
+
+
 conc_xarray_final = conc_xarray_final.rio.set_crs(rasterio.crs.CRS.from_epsg(4326), inplace = False) #
 
 
-
+conc_xarray_final
 
 
 
@@ -317,20 +282,25 @@ np.log(conc_xarray_final.sel(source=source_id, time=slice(0, None)).fillna(0).me
 conc_xarray_final.sel(source=source_id, time=slice(1, None)).isel(start_date=0).fillna(0).mean(dim='time').plot()
 
 
-conc_xarray_final.sel(source=source_id, time=slice(1, None)).isel(start_date=1).fillna(0).mean(dim='time').plot(x="longitude", y="latitude")
+conc_xarray_final.sel(source=source_id, time=slice(1, None)).isel(start_date=1).fillna(0).mean(dim='time').plot()
 
 
-conc_xarray_final.sel(source=source_id, time=slice(1, None)).isel(start_date=2).fillna(0).mean(dim='time').plot(x="longitude", y="latitude")
+conc_xarray_final.sel(source=source_id, time=slice(1, None)).isel(start_date=2).fillna(0).mean(dim='time').plot()
 
-conc_xarray_final.sel(source=source_id, time=slice(1, None)).isel(start_date=3).fillna(0).mean(dim='time').plot(x="longitude", y="latitude")
+conc_xarray_final.sel(source=source_id, time=slice(1, None)).isel(start_date=3).fillna(0).mean(dim='time').plot()
+
+
+import sys
+# in GB
+sys.getsizeof(conc_xarray_final)/1_000_000
 
 
 
-population_raster = rioxarray.open_rasterio( 'data\\population_grid\\india-spatial-india-census-2011-population-grid\\india_pop\\w001001.adf')
-population_raster = rioxarray.open_rasterio(r'data\population_grid\gpw_v4_population_density_adjusted_to_2015_unwpp_country_totals_rev11_2020_2pt5_min.tif')
+#population_raster = rioxarray.open_rasterio( 'data\\population_grid\\india-spatial-india-census-2011-population-grid\\india_pop\\w001001.adf')
+#population_raster = rioxarray.open_rasterio(r'data\population_grid\gpw_v4_population_density_adjusted_to_2015_unwpp_country_totals_rev11_2020_2pt5_min.tif')
 population_raster = rioxarray.open_rasterio(r'data\population_grid\ppp_2018_1km_Aggregated.tif')
 
-population_raster.plot()
+#population_raster.plot()
 
 # look at what exact type of resampling are you using
 pop_raster_matched = population_raster.rio.reproject_match(conc_xarray_final)
@@ -340,14 +310,33 @@ pop_raster_matched_masked = pop_raster_matched.where(pop_raster_matched >-0.1)
 pop_raster_matched_masked.plot()
 np.log(pop_raster_matched_masked).plot()
 
+pop_raster_matched_masked_other
+np.log(pop_raster_matched_masked_other).plot()
 
+pop_raster_matched_masked_other = xr.where(pop_raster_matched >-0.1,pop_raster_matched, 0)
+conc_xarray_final
 conc_xarray_final_masked = conc_xarray_final.where(pop_raster_matched >-0.1)
 
-conc_xarray_final_masked.sel(source=source_id, time=slice(1, None)).fillna(0).mean(dim='start_date').mean(dim='time').plot()
+conc_xarray_final_masked.sel(source=source_id, time=slice(None, 6)).fillna(0).mean(dim='start_date').mean(dim='time').plot()
 
+del pop_raster_matched_masked
+del conc_xarrays_list
+del population_raster
+import gc
+gc.collect()
 
+conc_xarray_final.dims
 pop_exposure_matrix = conc_xarray_final_masked.fillna(0).mean(dim='start_date').mean(dim='time').dot(pop_raster_matched_masked.fillna(0), dims = ['x', 'y'])
+#pop_exposure_matrix = conc_xarray_final.fillna(0).mean(dim='start_date').mean(dim='time').dot(pop_raster_matched_masked_other, dims = ['x', 'y'])
 
+conc_xarray_final_masked
+
+pop_exposure_matrix.to_netcdf("data/intermed_files/pop_exposure_matrix_10_years.nc")
+
+pop_exposure_matrix = xr.open_dataarray("data/intermed_files/pop_exposure_matrix_10_years.nc")
+pop_exposure_matrix.rio.crs
+
+conc_xarray_final = conc_xarray_final.rio.set_crs(rasterio.crs.CRS.from_epsg(4326), inplace = False) #
 
 
 pop_exposure_matrix.isel(band=0).set_index(source=['lon_source', 'lat_source'],).unstack("source").plot(x='lon_source', y='lat_source')
@@ -355,6 +344,32 @@ pop_exposure_matrix.isel(band=0).set_index(source=['lon_source', 'lat_source'],)
 pop_exposure_matrix.isel(band=0).plot.hist()
 
 pop_exposure_by_lonlat = pop_exposure_matrix.isel(band=0).set_index(source=['lon_source', 'lat_source'],).unstack("source")
+
+pop_exposure_by_lonlat.plot(x='lon_source', y='lat_source')
+
+pop_exposure_by_lonlat = pop_exposure_by_lonlat.set_index(x = 'lon_source', y='lat_source').rio.set_crs(rasterio.crs.CRS.from_epsg(4326), inplace = False) #
+#pop_exposure_by_lonlat = pop_exposure_by_lonlat.rio.set_crs(rasterio.crs.CRS.from_epsg(4326), inplace = False) #
+
+pop_exposure_by_lonlat = pop_exposure_by_lonlat.set_index(x = ['lon_source'], y='lat_source')
+pop_exposure_by_lonlat = pop_exposure_by_lonlat.sortby(["y", "x"]) # THIS SOLVED THE PROBLEM
+pop_exposure_by_lonlat.rio.write_crs("epsg:4326", inplace=True)
+
+
+pop_exposure_by_lonlat = pop_exposure_by_lonlat.transpose('lat_source', 'lon_source')
+pop_exposure_by_lonlat = pop_exposure_by_lonlat.rio.set_spatial_dims(x_dim = 'lon_source', y_dim='lat_source', inplace=False)
+pop_exposure_by_lonlat = pop_exposure_by_lonlat.rio.set_crs(rasterio.crs.CRS.from_epsg(4326), inplace = False) #
+
+
+pop_exposure_by_lonlat.rio.to_raster('data/intermed_files/pop_exposure_matrix_10_years_with_crs.tif')
+pop_exposure_by_lonlat.rio.crs
+pop_exposure_by_lonlat.rio.info
+pop_exposure_by_lonlat.plot()
+
+
+pop_exposure_by_lonlat.to_netcdf("data/intermed_files/pop_exposure_matrix_10_years_with_crs.nc")
+
+pop_exposure_matrix = xr.open_dataarray("data/intermed_files/pop_exposure_matrix_10_years.nc")
+
 
 import cartopy
 
