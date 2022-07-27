@@ -9,7 +9,7 @@ import rioxarray
 import matplotlib.pyplot as plt
 #!pip install git+https://github.com/noaa-oar-arl/monetio.git
 
-os.chdir(r'C:\Users\marti\Dropbox\research_projects\air_pollution')
+os.chdir('C:/Users/marti/Dropbox/research_projects/air_pollution')
 
 
 import monetio as mio
@@ -21,35 +21,6 @@ hysplitfile = 'C:/HYSPLIT/working/cdumps/cdump_06100100'
 
 
 
-
-def get_latlongrid(dset, xindx, yindx):
-    """
-    INPUTS
-    dset : xarray data set from ModelBin class
-    xindx : list of integers
-    yindx : list of integers
-    RETURNS
-    mgrid : output of numpy meshgrid function.
-            Two 2d arrays of latitude, longitude.
-    """
-    llcrnr_lat = dset.attrs["Concentration Grid"]["llcrnr latitude"]
-    llcrnr_lon = dset.attrs["Concentration Grid"]["llcrnr longitude"]
-    nlat = dset.attrs["Concentration Grid"]["Number Lat Points"]
-    nlon = dset.attrs["Concentration Grid"]["Number Lon Points"]
-    dlat = dset.attrs["Concentration Grid"]["Latitude Spacing"]
-    dlon = dset.attrs["Concentration Grid"]["Longitude Spacing"]
-
-    lat = np.arange(llcrnr_lat, llcrnr_lat + nlat * dlat, dlat)
-    lon = np.arange(llcrnr_lon, llcrnr_lon + nlon * dlon, dlon)
-    print(nlat, nlon, dlat, dlon)
-    print("lon shape", lon.shape)
-    print("lat shape", lat.shape)
-    #print(lat)
-    #print(lon)
-    lonlist = [lon[x - 1] for x in xindx]
-    latlist = [lat[x - 1] for x in yindx]
-    mgrid = np.meshgrid(lonlist, latlist)
-    return mgrid
 
 def get_latlongrid_flat(dset, xindx, yindx):
     """
@@ -83,13 +54,6 @@ def get_latlongrid_flat(dset, xindx, yindx):
 
 my_modelbin = mio.models.hysplit.ModelBin(hysplitfile, verbose=False)
 
-my_modelbin.atthash['Starting Locations']
-my_modelbin.atthash
-my_modelbin.nonzeroconcdates
-my_modelbin.dset
-
-
-
 
 
 dir(my_modelbin.dset.data_vars)
@@ -97,24 +61,21 @@ dir(my_modelbin.dset.data_vars)
 time_period = 0
 
 my_modelbin.dset.data_vars['006F'][time_period][0].plot(x="longitude", y="latitude")
-
-
 my_modelbin.dset.data_vars['0001'][time_period][0].plot(x="longitude", y="latitude")
-
 my_modelbin.dset.data_vars['0079'][time_period][0].plot(x="longitude", y="latitude")
 
 
 
 all_source_xarray = my_modelbin.dset.to_array(dim='source')
-
 sources_hexdec_index = list(my_modelbin.dset.data_vars.keys())
 
+all_source_xarray['source']
 
 int(sources_hexdec_index[60], base=16)
 
 sources_dec_index = [int(x, base=16) for x in sources_hexdec_index]
 
-with open('C:/HYSPLIT/working/CONTROL') as f:
+with open('config_files/CONTROL') as f:
     lines = f.readlines()
 
 
@@ -124,12 +85,9 @@ n_of_sources = int(lines[1].replace('\n', ''))
 sources_coords_list = lines[2:(n_of_sources+2)]
 
 sources_coords_list[0].split()
-
 sources_coords_array = [x.split() for x in sources_coords_list]
-
 sources_coords_array = np.array(sources_coords_array, dtype=np.float32)
 sources_coords_array = sources_coords_array[:,0:2 ] # remove height colmun
-
 sources_coords_df = pd.DataFrame(sources_coords_array, columns=['lat_source', 'lon_source'], index=sources_hexdec_index)
 
 sources_coords_df.loc['0015']
@@ -602,11 +560,9 @@ conc_xarray_final
 
 
 
-!pip install rioxarray
+#!pip install rioxarray
 
 import rioxarray
-
-
 
 
 
@@ -658,11 +614,11 @@ par_dump_alt = mio.models.hysplit.open_dataset(hysplit_pardump_file)
 
 
 
-par_dump = mio.models.pardump.Pardump(hysplit_pardump_file)
-par_dump = Pardump(hysplit_pardump_file)
+#par_dump = mio.models.pardump.Pardump(hysplit_pardump_file)
+#par_dump = Pardump(hysplit_pardump_file)
 
 
-read_par_dump = par_dump.read(century=1900)
+#read_par_dump = par_dump.read(century=1900)
 
 import datetime
 
@@ -788,310 +744,5 @@ class Pardump():
     # def writeascii(self, drange=[], verbose=1, century=2000, sorti=[]):
     #    read(self, drange=[], verbose=1, century=2000, sorti=[]):
 
-    def read(self, drange=None, verbose=1, century=2000, sorti=None):
-        """
-        daterange should be a list of two datetime.datetime objects
-        indicating the beginning
-        and ending date of the particle positions of interest.
-        Returns
-           pframehash :  dictionary.
-        The key is the date of the particle positions in YYMMDDHH.
-        The value is a pandas dataframe object with the particle information.
-        sorti is a list of sort indices. If sorti not None then will
-        only return particles
-        with those sort indices.
-        nsort keeps track of which particle it is throughout the time.
-        Could use this to keep track of initial height and time of release.
-        """
-
-        imax = 100
-        # returns a dictionary of pandas dataframes. Date valid is the key.
-        pframe_hash = {}
-        with open(self.fname, 'rb') as fp:
-            i = 0
-            testf = True
-            while testf:
-                hdata = np.fromfile(fp, dtype=self.hdr_dt, count=1)
-                if verbose:
-                    print('Record Header ', hdata)
-                if not hdata:
-                    print('Done reading ', self.fname)
-                    break
-                if hdata['year'] < 1000:
-                    year = hdata['year'] + century
-                else:
-                    year = hdata['year']
-                pdate = datetime.datetime(
-                    year,
-                    hdata['month'],
-                    hdata['day'],
-                    hdata['hour'],
-                    hdata['minute'])
-                # if drange==[]:
-                #   drange = [pdate, pdate]
-                parnum = hdata['parnum']
-                data = np.fromfile(fp, dtype=self.pardt, count=parnum[0])
-                # n = parnum - 1
-                # padding at end of each record
-                np.fromfile(fp, dtype='>i', count=1)
-                if verbose:
-                    print('Date ', pdate, ' **** ', drange)
-
-                testdate = False
-                if not drange:
-                    testdate = True
-                elif pdate >= drange[0] and pdate <= drange[1]:
-                    testdate = True
-
-               # Only store data if it is in the daterange specified.
-                if testdate:
-                    print('Adding data ', hdata, pdate)
-                    # otherwise get endian error message when create dataframe.
-                    ndata = data.byteswap().newbyteorder()
-                    par_frame = pd.DataFrame.from_records(
-                        ndata)  # create data frame
-                    # drop the fields which were padding
-                    par_frame.drop(['p1', 'p2', 'p3', 'p4'],
-                                   inplace=True,
-                                   axis=1)
-                    par_frame.drop(['su', 'sv', 'sx', 'mgrid'],
-                                   inplace=True,
-                                   axis=1)  # drop other fields
-                    # drop where the lat field is 0. because
-                    par_frame = par_frame.loc[par_frame['lat'] != 0]
-                    # in pardump file particles which have not been
-                    # released yet
-
-                    if sorti:
-                        # returns only particles with
-                        par_frame = par_frame.loc[par_frame['sorti'].isin(
-                            sorti)]
-                        # sort index in list sorti
-                    par_frame['date'] = pdate
-                    # par_frame.sort('ht', inplace=True)  # sort by height
-                    par_frame = pd.concat(
-                        [par_frame], keys=[
-                            self.fname])  # add a filename key
-                    # create dictionary key for output.
-                    datekey = pdate.strftime(self.dtfmt)
-                    # Add value to dictionary.
-                    pframe_hash[datekey] = par_frame
-
-                # Assume data is written sequentially by date.
-                i += 1
-
-                if drange:
-                    if pdate > drange[1]:
-                        testf = False
-                        if verbose:
-                            print("Past date. Closing file.", drange[1], pdate)
-                    # elif  drange[0] < pdate:
-                    #   testf=False
-                    #   if verbose:
-                    #      print "Before date. Closing file"
-                if i > imax:
-                    print('Read pardump. Limited to 100 iterations. Stopping')
-                    testf = False
-        return pframe_hash
 
 
-
-
-import monetio.models.pardump as pardump
-
-par_dump_2 = pardump.open_dataset(hysplit_pardump_file, century=1900)
-
-
-read_par_dump = par_dump.read(century=1900)
-
-# https://hysplitbbs.arl.noaa.gov/viewtopic.php?f=28&t=1245
-# https://www.ready.noaa.gov/hysplitusersguide/S350.htm
-
-class VolcPar:
-    def __init__(self, fdir="./", fname="PARDUMP.A"):
-        fname = fname
-        self.tname = os.path.join(fdir, fname)
-        self.strfmt = "%Y%m%d%H%M"
-        self.start = datetime.datetime.now()
-        self.delta = datetime.timedelta(hours=1)
-        self.delt = 5
-        self.ymax = 9
-        self.pdict = {}
-
-    def read_pardump(self, drange=None, century=2000):
-        self.df = pardump.open_dataset(fname=self.tname, drange=drange, century=century)
-        # pd = pardump.Pardump(fname=self.tname)
-        # self.df = pd.read(century=century)
-
-    # def key2time(self):
-    #    datelist=[]
-    #    for key in self.pdict.keys:
-    #        datelist.append(datetime.datetime.strptime(key, self.strfmt))
-    #    #self.datetlist = datelist
-    #    return datelist
-
-    def getbytime(self,time):
-        # returns a dataframe for that time.
-        dstr = time.strftime(self.strfmt)
-        return self.pdict[dstr]
-
-    def findsource(self, sorti):
-        done = False
-        iii = 0
-        while not done:
-            d1 = self.start + iii * self.delta
-            print("find source", d1)
-            df1 = self.getbytime(d1)
-            print("Ages", df1["age"].unique())
-            # keep only the new particles.
-            df1 = df1[df1["age"] == self.delt]
-
-            # if no particles released then
-            if df1.empty and iii != 0:
-                done = True
-                print("empty", iii)
-                continue
-            df1 = df1[df1["sorti"].isin(sorti)]
-            if iii == 0:
-                dfsource = df1
-            else:
-                dfsource = pd.concat([dfsource, df1])
-            iii += 1
-        return dfsource
-
-    def plotsource(self, dfhash):
-        x = []
-        y = []
-        for key in dfhash.keys():
-            sorti = dfhash[key]["sorti"]
-            dfsource = self.findsource(sorti)
-            x.extend(dfsource["date"])
-            y.extend(dfsource["ht"])
-        x2 = time2int(x)
-        # put time into minutes since start
-        x2 = np.array(x2) / 60.0
-        # put height into km
-        y = np.array(y) / 1000.0
-        xbins = np.arange(0, 200, 5)
-        ybins = np.arange(0, 4 * 9) / 4.0
-        cb = plt.hist2d(x2, y, bins=[xbins, ybins])
-        plt.colorbar(cb[3])
-        # sns.heatmap(x,y)
-        return x2, y
-
-def time2int(timelist):
-    newlist = []
-    tmin = np.min(timelist)
-    for ttt in timelist:
-        val = ttt - tmin
-        newlist.append(val.seconds)
-    return newlist
-
-
-def average_mfitlist(mfitlist, dd=None, dh=None, buf=None, lat=None, lon=None, ht=None):
-    """
-    mfitlist : list of MassFit objects
-    returns xarray DataArray
-    """
-    logger.debug("Running average_mfitlist in par2conc")
-    concra = combine_mfitlist(mfitlist, dd, dh, buf, lat, lon, ht)
-    concra = concra.mean(dim="time")
-    return concra
-
-
-def combine_mfitlist(
-    mfitlist, dd=None, dh=None, buf=None, lat=None, lon=None, ht=None,
-):
-    """
-    mfitlist : list of MassFit objects.
-    finds concentrations from each fit and combines into
-    one xarray along dimension called 'time'. Although in
-    some cases that dimension may represent something other than time.
-    e.g. ensemble member number.
-    returns xarray DataArray
-    """
-    logger.debug("Running combine_mfitlist in par2conc")
-    iii = 0
-    concra = xr.DataArray(None)
-    templist = []
-    # conclist = []
-    minlat = 90
-    minlon = 180
-    maxlat = -90
-    maxlon = -180
-
-    # fit all time periods and put arrays in a list.
-    # keep track of range of latitude and longitude so
-    # lat-lon grid can be created later.
-    for mfit in mfitlist:
-        latra, lonra, htra = mfit.get_grid(dd, dh, buf, lat, lon, ht)
-        conc = mfit.get_conc2(dd=dd, dh=dh, latra=latra, lonra=lonra, htra=htra)
-        minlat = np.min([minlat, np.min(latra)])
-        minlon = np.min([minlon, np.min(lonra)])
-        maxlat = np.max([maxlat, np.max(latra)])
-        maxlon = np.max([maxlon, np.max(lonra)])
-        templist.append(conc)
-    # for xr.align to work properly, the coordinates
-    # need to be integers.
-    # This list comprehension changes the lat-lon coordinates to ints.
-    # by applying the reindex function to all xarrays in templist.
-    # re-index all the arrays to the largest grid.
-    nlat = np.abs(np.ceil((maxlat - minlat) / dd)) + 1
-    nlon = np.abs(np.ceil((maxlon - minlon) / dd)) + 1
-    conclist = [reindex(x, minlat, minlon, nlat, nlon, dd, dd) for x in templist]
-    # for conc in templist:
-    # nlat = np.abs(np.ceil((maxlat - minlat) / dd)) + 1
-    # nlon = np.abs(np.ceil((maxlon - minlon) / dd)) + 1
-    #    conc2 = reindex(conc, minlat, minlon, nlat, nlon, dd, dd)
-    #    conclist.append(conc2)
-    #    print('MFIT', conc2)
-    # create large xarray to align to.
-    iii = 0
-    for conc in conclist:
-        if iii == 0:
-            xnew = conc.copy()
-        else:
-            a, xnew = xr.align(conc, xnew, join="outer")
-        iii += 1
-
-    # align all arrays to largest one.
-    iii = 0
-    templist = []
-    for temp in conclist:
-        aaa, bbb = xr.align(temp, xnew, join="outer")
-        aaa = aaa.fillna(0)
-        aaa.expand_dims("time")
-        aaa["time"] = iii
-        templist.append(aaa)
-        iii += 1
-
-    # concatenate the aligned arrays.
-    concra = xr.concat(templist, "time")
-
-    # fill nans with 0
-    concra = concra.fillna(0)
-
-    # add time dimesion if not there.
-    # if 'time' not in concra.dims:
-    #    concra = concra.expand_dims('time')
-
-    # add the lat lon coordinates back in
-    concra = concra.drop("latitude")
-    concra = concra.drop("longitude")
-
-    # np.clip was added because sometimes due to the floating point
-    # arithmetic arange returns an array with an extra number.
-    # clip replaces any numbers larger than the max with the max value.
-    # then remove duplicate values at the end.
-    latra = np.clip(np.arange(minlat, maxlat + dd, dd), None, maxlat)
-    lonra = np.clip(np.arange(minlon, maxlon + dd, dd), None, maxlon)
-    if latra[-1] == latra[-2]:
-        latra = latra[0:-1]
-    if lonra[-1] == lonra[-2]:
-        lonra = lonra[0:-1]
-    mgrid = np.meshgrid(lonra, latra)
-
-    concra = concra.assign_coords(longitude=(("y", "x"), mgrid[0]))
-    concra = concra.assign_coords(latitude=(("y", "x"), mgrid[1]))
-
-    return concra
