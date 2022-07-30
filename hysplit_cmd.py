@@ -8,38 +8,15 @@ cd %PGM%\working
 %PGM%\exec\hycs_std
 """
 
-from subprocess import PIPE, run
-
-command = ['echo', 'hello']
-result = subprocess.run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True, shell=True)
-print(result.returncode, result.stdout, result.stderr)
-
-
-subprocess.call(hysplit_cmd, shell=True)
-
-subprocess.check_output()
-
-
-myBat = open(r'C:\Users\marti\Dropbox\research_projects\air_pollution\my_test_2.bat','w+')
-myBat.write('''@echo off
-color a & date
-pause
-''')
-myBat.close()
-
-
-
-import subprocess
-subprocess.call([r'+\run_exe.bat'])
 
 import os
-os.system(r"C:\Users\marti\Dropbox\research_projects\air_pollution\run_exe.bat")
+#os.system(r"C:\Users\marti\Dropbox\research_projects\air_pollution\run_exe.bat")
 
 
 
 
 params_dict = {'source_year': '14', 'source_month': '10', 'source_day': '01', 'source_hour': '00',
-                'input_file_name': 'test_exec_cdump_new_2'}
+                'input_file_name': 'test_exec_cdump_new_2', 'length_in_hours' : '96'}
 
 
 
@@ -68,7 +45,7 @@ echo  3                      >>CONTROL
 echo  27.0 73.5 10.0         >>CONTROL
 echo  32.0 78.5 10.0         >>CONTROL
 echo  27.5 74.0 10.0         >>CONTROL
-echo 96                      >>CONTROL
+echo {length_in_hours}       >>CONTROL
 echo 0                       >>CONTROL
 echo 10000.0                 >>CONTROL
 echo 1                       >>CONTROL
@@ -109,28 +86,20 @@ IF EXIST %INP% DEL %INP%
 
 print(hysplit_batch_script.format(**params_dict))
 
-hysplit_cmd_final = hysplit_batch_script.format(**params_dict)
-
-myBat = open(r'C:\Users\marti\Dropbox\research_projects\air_pollution\my_hysplit_test.bat','w+')
-myBat.write(hysplit_cmd_final)
-myBat.close()
 
 
-
-import subprocess
-subprocess.call([r'C:\Users\marti\Dropbox\research_projects\air_pollution\my_hysplit_test.bat'])
-
-
+#import subprocess
+#subprocess.call([r'C:\Users\marti\Dropbox\research_projects\air_pollution\my_hysplit_test.bat'])
 
 
 
 
 def run_hysplit(source_year='14', source_month = '10', source_day = '01', source_hour = '00',
-                conc_file_name_prefix = 'cdumps\cdump_'):
+                conc_file_name_prefix = 'cdumps/ten_days_length/cdump_', length_in_hours = '96'):
 
     final_file_name = conc_file_name_prefix + source_year + source_month + source_day + source_hour
     params_dict = {'source_year': source_year, 'source_month': source_month, 'source_day': source_day, 'source_hour': source_hour,
-                    'input_file_name': final_file_name}
+                    'input_file_name': final_file_name, 'length_in_hours': length_in_hours}
 
     hysplit_cmd_final = hysplit_batch_script.format(**params_dict)
 
@@ -144,19 +113,18 @@ def run_hysplit(source_year='14', source_month = '10', source_day = '01', source
 
 
 
-year_list = ['13', '14', '16', '17']
-year_list = [ '14']
-
-len(year_list)
 year_list = ['06', '07', '08', '09', '10', '11', '12', '15', '16', '17']
 
 for year in year_list:
     print(year)
-    run_hysplit(source_year = year)
+#    run_hysplit(source_year = year)
+# second batch
+    run_hysplit(source_year = year, source_day = '01', source_hour = '09',
+                length_in_hours = '240')
 
 
-
-
+# 2 h 38 m 33 s
+# 2nd batch: 111 minutes
 
 new_cmd = """@echo off
 setLocal EnableDelayedExpansion
