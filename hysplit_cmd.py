@@ -16,7 +16,8 @@ import os
 
 
 params_dict = {'source_year': '14', 'source_month': '10', 'source_day': '01', 'source_hour': '00',
-                'input_file_name': 'test_exec_cdump_new_2', 'length_in_hours' : '96'}
+                'input_file_name': 'test_exec_cdump_new_2', 'length_in_hours' : '96',
+                'conc_measurement_freq_hours': '12'}
 
 
 
@@ -42,9 +43,9 @@ SET INP={input_file_name}
 
 echo %SYR% %SMO% %SDA% %SHR% >CONTROL
 echo  3                      >>CONTROL
-echo  27.0 73.5 10.0         >>CONTROL
-echo  32.0 78.5 10.0         >>CONTROL
-echo  27.5 74.0 10.0         >>CONTROL
+echo  {lower_left_source_grid} {source_height}       >>CONTROL
+echo  {upper_right_source_grid} {source_height}        >>CONTROL
+echo  {resolution_source_grid} {source_height}        >>CONTROL
 echo {length_in_hours}       >>CONTROL
 echo 0                       >>CONTROL
 echo 10000.0                 >>CONTROL
@@ -66,7 +67,7 @@ echo 1                      >>CONTROL
 echo 1200                   >>CONTROL
 echo 00 00 00 01 00         >>CONTROL
 echo 00 00 00 00 00         >>CONTROL
-echo 00 12 00               >>CONTROL
+echo 00 {conc_measurement_freq_hours} 00     >>CONTROL
 echo 1                      >>CONTROL
 echo 0.0 0.0 0.0            >>CONTROL
 echo 0.0 0.0 0.0 0.0 0.0    >>CONTROL
@@ -95,11 +96,19 @@ print(hysplit_batch_script.format(**params_dict))
 
 
 def run_hysplit(source_year='14', source_month = '10', source_day = '01', source_hour = '00',
-                conc_file_name_prefix = 'cdumps/ten_days_length/cdump_', length_in_hours = '96'):
+                conc_file_name_prefix = 'cdumps/ten_days_length/cdump_', length_in_hours = '96',
+                conc_measurement_freq_hours = '12',
+                lower_left_source_grid = '27.0 73.5', upper_right_source_grid = '32.0 78.5',
+                resolution_source_grid = '27.5 74.0', source_height = '10.0'):
 
     final_file_name = conc_file_name_prefix + source_year + source_month + source_day + source_hour
     params_dict = {'source_year': source_year, 'source_month': source_month, 'source_day': source_day, 'source_hour': source_hour,
-                    'input_file_name': final_file_name, 'length_in_hours': length_in_hours}
+                    'input_file_name': final_file_name, 'length_in_hours': length_in_hours,
+                    'conc_measurement_freq_hours': conc_measurement_freq_hours,
+                    'lower_left_source_grid': lower_left_source_grid,
+                    'upper_right_source_grid': upper_right_source_grid,
+                    'resolution_source_grid': resolution_source_grid,
+                    'source_height': source_height}
 
     hysplit_cmd_final = hysplit_batch_script.format(**params_dict)
 
@@ -120,7 +129,8 @@ for year in year_list:
 #    run_hysplit(source_year = year)
 # second batch
     run_hysplit(source_year = year, source_day = '01', source_hour = '09',
-                length_in_hours = '240')
+                length_in_hours = '240', conc_file_name_prefix = 'cdumps/two_hours_freq/cdump_',
+                conc_measurement_freq_hours = '01')
 
 
 # 2 h 38 m 33 s
