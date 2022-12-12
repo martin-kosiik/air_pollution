@@ -33,7 +33,7 @@ cell_size<-area(population_crop, weights=FALSE, na.rm = T)
 
 pop_density <- population_crop/cell_size
 
-plot(pop_density)
+#plot(pop_density)
 
 xy <- data.frame(x = 30, y = 75)
 xy <- data.frame(x = 75, y = 30)
@@ -151,7 +151,11 @@ create_circle <- function(lat_x, long_y, theta_x=0, buffer_m=30000){
 
 #source_xy_df <- head(xy)
 
-source_xy_df <- xy
+x <- seq(from = 73, to = 78, by = 0.1)
+y <- seq(from = 28, to = 32, by = 0.1)
+
+## create a grid of all pairs of coordinates (as a data.frame)
+source_xy_df <- expand.grid(x = x, y = y)
 
 
 map2(source_xy_df$x, source_xy_df$y, ~ .x + .y)
@@ -166,15 +170,29 @@ source_df_list <- map2(source_xy_df$x, source_xy_df$y, ~
 source_df_list <- map2(source_df_list, pop_within_30km_quart_list , ~ .x %>% mutate(pop_within_30km = .y))
 
 
+# https://link.springer.com/content/pdf/10.1007/s00703-017-0512-2.pdf
+nw_share <- 0.06 + 0.16 + 0.18 + 0.03
+ne_share <- 0.005+ 0.01 + 0.03 + 0.003
+sw_share <- 0.03 + 0.05 + 0.07 + 0.005 + 0.005
+se_share <- 0.07 + 0.01 + 0.01 + 0.06+ 0.005
+
+wd_sum <- ne_share +nw_share + sw_share + se_share
+
+nw_share <- nw_share * (1/wd_sum)
+ne_share <- ne_share * (1/wd_sum)
+sw_share <- sw_share * (1/wd_sum)
+se_share <- se_share * (1/wd_sum)
+
+ne_share +nw_share + sw_share + se_share
 
 # https://www.weatheronline.in/weather/maps/city?FMM=10&FYY=2000&LMM=11&LYY=2000&WMO=42182&CONT=inin&REGION=0024&LAND=II&ART=WDR&R=0&NOREGION=0&LEVEL=162&LANG=in&MOD=tab
 
-nw_share <- 0.33 + 0.015 + 0.10
-ne_share <- 0.015+ 0.055
-sw_share <- 0.13 + 0.03 + 0.10
-se_share <- 0.14 + 0.03 + 0.055
+#nw_share <- 0.33 + 0.015 + 0.10
+#ne_share <- 0.015+ 0.055
+#sw_share <- 0.13 + 0.03 + 0.10
+#se_share <- 0.14 + 0.03 + 0.055
 
-#ne_share +nw_share + sw_share + se_share
+ne_share +nw_share + sw_share + se_share
 
 source_df_all <- source_df_list %>% 
   bind_rows() %>% 
@@ -195,11 +213,16 @@ plot(weighted_pop_with_30km)
 weighted_pop_with_30km                  
 
 plot(weighted_pop_with_30km> 200000)
+plot(resampled_weighted_pop_with_30km> 200000)
 
 
 infant_share <- 25/1393
 
-costs_of_per_km2_reduction_in_burned_area <- 2700/75 * 2.47 *100
+costs_in_inr_per_unburned_acre <- 2700
+costs_in_inr_per_unburned_acre <- 4051.3
+
+
+costs_of_per_km2_reduction_in_burned_area <- costs_in_inr_per_unburned_acre/75 * 2.47 *100
 infant_mort_increase_per_km2_burned <- 0.00096
 
 how_many_infants_we_save_per_dollar <- (weighted_pop_with_30km * infant_share * infant_mort_increase_per_km2_burned)/costs_of_per_km2_reduction_in_burned_area
@@ -234,3 +257,37 @@ ggplot() +
   ggtitle("Elevation with hillshade") +
   coord_quickmap()
 
+
+
+burned_area <- raster("data/burned_area/MCD64A1.006_Burn_Date_doy2019274_aid0001 (1).tif") 
+plot(burned_area)
+
+#crs(burned_area) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0" 
+
+burned_area <- projectRaster(burned_area, crs = "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0" )
+
+crs(weighted_pop_with_30km) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0" 
+
+burned_area_cat <- (burned_area > 1)*1
+plot(burned_area_cat)
+
+
+resampled_weighted_pop_with_30km <- resample(weighted_pop_with_30km, burned_area_cat, method='bilinear')
+
+plot(resampled_weighted_pop_with_30km)
+
+resampled_weighted_pop_with_30km <- burned_area_cat * resampled_weighted_pop_with_30km
+
+resampled_weighted_pop_with_30km[resampled_weighted_pop_with_30km <= 0] <- NA
+
+
+how_many_infants_we_save_per_dollar <- (resampled_weighted_pop_with_30km * infant_share * infant_mort_increase_per_km2_burned)/costs_of_per_km2_reduction_in_burned_area
+
+dollars_to_save_a_infant <- costs_of_per_km2_reduction_in_burned_area/(resampled_weighted_pop_with_30km * infant_share * infant_mort_increase_per_km2_burned)
+
+plot(dollars_to_save_a_infant)
+
+hist(dollars_to_save_a_infant@data@values)
+
+ggplot(data.frame(dollars_to_save_a_infant = dollars_to_save_a_infant@data@values),
+       aes(x = dollars_to_save_a_infant)) + geom_histogram()  +xlim(0, 6000)
