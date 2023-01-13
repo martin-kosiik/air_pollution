@@ -21,7 +21,7 @@ population <- raster("data/population_grid/ppp_2018_1km_Aggregated.tif")
 #plot(population)
 
 
-b <- as(extent(73, 78, 28, 32), 'SpatialPolygons')
+b <- as(extent(70, 80, 26, 34), 'SpatialPolygons')
 crs(b) <- crs(population)
 #mapview(b)
 
@@ -35,19 +35,30 @@ pop_density <- population_crop/cell_size
 
 #plot(pop_density)
 
-xy <- data.frame(x = 30, y = 75)
-xy <- data.frame(x = 75, y = 30)
+#xy <- data.frame(x = 30, y = 75)
+#xy <- data.frame(x = 75, y = 30)
 
 
 # 1:ncell(r)
 #pop_within_30km <- raster::extract(population_crop , y = 1:100 , buffer = 30000 , fun = sum )
 
 
+
+
+
+
+
+
+
+###################################################
+#Wind direction not taken into account
+
 x <- seq(from = 73, to = 78, by = 0.1)
 y <- seq(from = 28, to = 32, by = 0.1)
 
 ## create a grid of all pairs of coordinates (as a data.frame)
 xy <- expand.grid(x = x, y = y)
+
 
 
 pop_within_30km <- raster::extract(population_crop , y = xy , buffer = 30000 , fun = sum, na.rm=T)
@@ -111,7 +122,8 @@ ggplot(pop_within_30km_df, aes(x = dollars_to_save_a_infant)) + geom_histogram()
 
 
 ####################################
-# quarters
+######################
+# Wind direction taken into account ()
 
 projected_crs <- crs(population_crop)
 #Function to create circle with quadrants. Save desired projection as projected_crs
@@ -171,19 +183,19 @@ source_df_list <- map2(source_df_list, pop_within_30km_quart_list , ~ .x %>% mut
 
 
 # https://link.springer.com/content/pdf/10.1007/s00703-017-0512-2.pdf
-nw_share <- 0.06 + 0.16 + 0.18 + 0.03
-ne_share <- 0.005+ 0.01 + 0.03 + 0.003
-sw_share <- 0.03 + 0.05 + 0.07 + 0.005 + 0.005
-se_share <- 0.07 + 0.01 + 0.01 + 0.06+ 0.005
-
-wd_sum <- ne_share +nw_share + sw_share + se_share
-
-nw_share <- nw_share * (1/wd_sum)
-ne_share <- ne_share * (1/wd_sum)
-sw_share <- sw_share * (1/wd_sum)
-se_share <- se_share * (1/wd_sum)
-
-ne_share +nw_share + sw_share + se_share
+# nw_share <- 0.06 + 0.16 + 0.18 + 0.03
+# ne_share <- 0.005+ 0.01 + 0.03 + 0.003
+# sw_share <- 0.03 + 0.05 + 0.07 + 0.005 + 0.005
+# se_share <- 0.07 + 0.01 + 0.01 + 0.06+ 0.005
+# 
+# wd_sum <- ne_share +nw_share + sw_share + se_share
+# 
+# nw_share <- nw_share * (1/wd_sum)
+# ne_share <- ne_share * (1/wd_sum)
+# sw_share <- sw_share * (1/wd_sum)
+# se_share <- se_share * (1/wd_sum)
+# 
+# ne_share +nw_share + sw_share + se_share
 
 # https://www.weatheronline.in/weather/maps/city?FMM=10&FYY=2000&LMM=11&LYY=2000&WMO=42182&CONT=inin&REGION=0024&LAND=II&ART=WDR&R=0&NOREGION=0&LEVEL=162&LANG=in&MOD=tab
 
@@ -192,14 +204,73 @@ ne_share +nw_share + sw_share + se_share
 #sw_share <- 0.13 + 0.03 + 0.10
 #se_share <- 0.14 + 0.03 + 0.055
 
-ne_share +nw_share + sw_share + se_share
+#ne_share +nw_share + sw_share + se_share
+
+
+
+wind_dir_u <- brick("data/wind_direction/uwnd.10m.mon.mean.nc")
+wind_dir_v <- brick("data/wind_direction/vwnd.10m.mon.mean.nc")
+
+
+all(names(wind_dir_u) == names(wind_dir_v))
+
+layer_names <- names(wind_dir_u)
+layer_months <- as.integer(substr(layer_names, 7,8))
+
+wind_dir_u_fall <- raster::subset(wind_dir_u, which(layer_months %in% c(10, 11)  ))
+wind_dir_v_fall <- raster::subset(wind_dir_v, which(layer_months  %in% c(10, 11) ))
+
+# The meteorological convention for winds is that U component is positive for 
+#a west to east flow (eastward wind) and the V component is positive for south to north flow (northward wind).
+
+ne <- (wind_dir_u_fall > 0) * (wind_dir_v_fall >0)
+nw <- (wind_dir_u_fall < 0) * (wind_dir_v_fall >0)
+se <- (wind_dir_u_fall > 0) * (wind_dir_v_fall <0)
+sw <- (wind_dir_u_fall < 0) * (wind_dir_v_fall <0)
+
+
+ne_mean <- mean(ne)
+nw_mean <- mean(nw)
+se_mean <- mean(se)
+sw_mean <- mean(sw)
+
+
+
+
+source_df_all$ne_share <- extract(ne_mean, source_df_all %>% dplyr::select(x,y), method = 'bilinear')
+source_df_all$nw_share <- extract(nw_mean, source_df_all %>% dplyr::select(x,y), method = 'bilinear')
+source_df_all$se_share <- extract(se_mean, source_df_all %>% dplyr::select(x,y), method = 'bilinear')
+source_df_all$sw_share <- extract(sw_mean, source_df_all %>% dplyr::select(x,y), method = 'bilinear')
+
+
+#source_df_all %>% 
+#  mutate(total_sum = ne_share + nw_share + se_share + sw_share) %>% 
+#  View()
+
+
+
+max(source_df_all$x)
+min(source_df_all$x)
+max(source_df_all$y)
+min(source_df_all$y)
+
+
+source_df_all %>% 
+    mutate(total_sum = ne_share + nw_share + se_share + sw_share)
+
 
 source_df_all <- source_df_list %>% 
-  bind_rows() %>% 
+  bind_rows()
+
+
+
+source_df_all <- source_df_all %>% 
   mutate(wind_dir_share = case_when(quadrant == 'nw' ~ nw_share,
                                     quadrant == 'ne' ~ ne_share,
                                     quadrant == 'sw' ~ sw_share,
                                     quadrant == 'se' ~ se_share))
+
+
 
 source_df_all<- source_df_all %>% 
   group_by(x, y) %>% 
@@ -254,7 +325,7 @@ ggplot() +
                   fill = dollars_to_save_a_infant)) + 
   #scale_fill_viridis_c() +  
   scale_fill_viridis_c( begin = 0, end = 1, direction = -1, limits = c(0, 5000)) +  
-  ggtitle("Elevation with hillshade") +
+  #ggtitle("Elevation with hillshade") +
   coord_quickmap()
 
 
@@ -287,7 +358,12 @@ dollars_to_save_a_infant <- costs_of_per_km2_reduction_in_burned_area/(resampled
 
 plot(dollars_to_save_a_infant)
 
-hist(dollars_to_save_a_infant@data@values)
+mapview(dollars_to_save_a_infant, layer.name = 'USD per an infant life saved')
+
+
+hist(dollars_to_save_a_infant@data@values, xlab = 'USD per an infant life saved', main = 'Histogram (1 km^2 pixels are the unit of obs.)')
 
 ggplot(data.frame(dollars_to_save_a_infant = dollars_to_save_a_infant@data@values),
        aes(x = dollars_to_save_a_infant)) + geom_histogram()  +xlim(0, 6000)
+
+
