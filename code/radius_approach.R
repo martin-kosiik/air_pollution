@@ -15,6 +15,9 @@ library(sf)
 library(lwgeom)
 library(sp)
 
+# Change to 1 if you want to also execute the code for the approach without wind direction
+compute_without_wind_direction <- 0
+
 
 population <- raster("data/population_grid/ppp_2018_1km_Aggregated.tif") 
 
@@ -52,6 +55,9 @@ pop_density <- population_crop/cell_size
 
 ###################################################
 #Wind direction not taken into account
+
+if(compute_without_wind_direction == 1){
+  
 
 x <- seq(from = 73, to = 78, by = 0.1)
 y <- seq(from = 28, to = 32, by = 0.1)
@@ -119,7 +125,7 @@ ggplot(pop_within_30km_df, aes(x = dollars_to_save_a_infant)) + geom_histogram()
 
 ggplot(pop_within_30km_df, aes(x = dollars_to_save_a_infant)) + geom_histogram()  +xlim(0, 10000)
 
-
+}
 
 ####################################
 ######################
@@ -180,6 +186,11 @@ source_df_list <- map2(source_xy_df$x, source_xy_df$y, ~
                          data.frame(x = rep(.x, 4), y = rep(.y, 4), quadrant = c('nw', 'sw', 'se', 'ne')) )
 
 source_df_list <- map2(source_df_list, pop_within_30km_quart_list , ~ .x %>% mutate(pop_within_30km = .y))
+
+
+
+source_df_all <- source_df_list %>% 
+  bind_rows()
 
 
 # https://link.springer.com/content/pdf/10.1007/s00703-017-0512-2.pdf
@@ -259,9 +270,6 @@ source_df_all %>%
     mutate(total_sum = ne_share + nw_share + se_share + sw_share)
 
 
-source_df_all <- source_df_list %>% 
-  bind_rows()
-
 
 
 source_df_all <- source_df_all %>% 
@@ -284,12 +292,11 @@ plot(weighted_pop_with_30km)
 weighted_pop_with_30km                  
 
 plot(weighted_pop_with_30km> 200000)
-plot(resampled_weighted_pop_with_30km> 200000)
 
 
 infant_share <- 25/1393
 
-costs_in_inr_per_unburned_acre <- 2700
+#costs_in_inr_per_unburned_acre <- 2700
 costs_in_inr_per_unburned_acre <- 4051.3
 
 
@@ -356,14 +363,79 @@ how_many_infants_we_save_per_dollar <- (resampled_weighted_pop_with_30km * infan
 
 dollars_to_save_a_infant <- costs_of_per_km2_reduction_in_burned_area/(resampled_weighted_pop_with_30km * infant_share * infant_mort_increase_per_km2_burned)
 
-plot(dollars_to_save_a_infant)
+#plot(dollars_to_save_a_infant)
 
-mapview(dollars_to_save_a_infant, layer.name = 'USD per an infant life saved')
+#mapview(dollars_to_save_a_infant, layer.name = 'USD per an infant life saved')
 
 
 hist(dollars_to_save_a_infant@data@values, xlab = 'USD per an infant life saved', main = 'Histogram (1 km^2 pixels are the unit of obs.)')
 
 ggplot(data.frame(dollars_to_save_a_infant = dollars_to_save_a_infant@data@values),
-       aes(x = dollars_to_save_a_infant)) + geom_histogram()  +xlim(0, 6000)
+       aes(x = dollars_to_save_a_infant)) + geom_histogram(col = "white") +  
+  theme_minimal() + labs(x = 'USD per an infant life saved',  caption= 'pixel-level at approx. 1 km resolution') +
+  theme(axis.line = element_line(size = 1), 
+        # panel.grid.major.x = element_blank(), 
+      #  panel.grid.minor.x = element_blank(), 
+        text = element_text(size=16))
+#+xlim(0, 6000)
+
+ggsave('figures/radius_approach/hist_usd_per_life_saved_var_wind_direction.pdf')
+
+library(ggmap)
+
+extent(72, 80, 28, 33)
+
+bbox <- c(left = 73, bottom = 28, right = 78, top = 33)
 
 
+
+
+
+
+terrain_map <- get_stamenmap(bbox, zoom = 7, maptype = "terrain")
+#map <- get_googlemap(center = c(lon= 76, lat = 30), zoom = 7, maptype = "hybrid")
+
+#map <- get_openstreetmap(bbox, zoom = 7)
+
+
+#https://stackoverflow.com/questions/48955504/how-to-overlay-a-transparent-raster-on-ggmap
+
+# https://gis.stackexchange.com/questions/389050/how-can-you-overlay-raster-data-on-a-stamenmap-in-r
+
+
+dollars_to_save_a_infant_data <- as.data.frame(rasterToPoints(dollars_to_save_a_infant))
+
+
+ggmap(terrain_map) +
+  geom_tile(data = dollars_to_save_a_infant_data, aes(x, y, fill = value), alpha = 0.5) +
+  scale_fill_gradient(low = "green", high = "red")
+
+ggplot() + 
+  geom_raster(aes(x = x, y = y, fill = layer), data = dollars_to_save_a_infant_data)
+
+ggplot() + 
+  geom_tile(aes(x = x, y = y, fill = layer), data = dollars_to_save_a_infant_data)
+
+
+
+ggmap(terrain_map) +
+  geom_tile(aes(x = x, y = y, fill = layer), data = dollars_to_save_a_infant_data)+
+  scale_fill_viridis_c(option = 'turbo', direction = -1)+ coord_quickmap()+
+  labs(x = 'longitude', y = 'latitude', fill = 'USD per an infant life saved')#+  scale_fill_gradientn(limits = c(0, 4000))
+
+
+ggmap(terrain_map) +
+  geom_tile(aes(x = x, y = y, fill = layer), data = dollars_to_save_a_infant_data)+
+  scale_fill_viridis_c(option = 'turbo', direction = -1)+ 
+  labs(x = 'longitude', y = 'latitude', fill = 'USD per an infant life saved')#+  scale_fill_gradientn(limits = c(0, 4000))
+
+
+
+ggsave('figures/radius_approach/map_usd_per_life_saved_var_wind_direction.pdf')
+
+
+
+ggmap(terrain_map) +
+  geom_tile(aes(x = x, y = y, fill = layer), data = dollars_to_save_a_infant_data)+
+  scale_fill_gradient(low = "red", high = "blue")+ coord_quickmap()+
+  labs(x = 'longitude', y = 'latitude', fill = 'USD per an infant life saved')
