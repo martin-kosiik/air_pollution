@@ -10,13 +10,15 @@ import matplotlib.pyplot as plt
 
 os.chdir('C:/Users/marti/Dropbox/research_projects/air_pollution')
 
+region_of_interest = 'vietnam'
+region_of_interest = 'india_low_res'
 
 import monetio as mio
 
-hysplitfile = 'C:/HYSPLIT/working/cdumps/china/cdump_06100109'
-hysplitfile = 'C:/HYSPLIT/working/cdumps/pakistan/cdump_06100109'
-
-hysplitfile = 'C:/HYSPLIT/working/cdumps/india/cdump_06100109'
+# hysplitfile = 'C:/HYSPLIT/working/cdumps/china/cdump_06100109'
+# hysplitfile = 'C:/HYSPLIT/working/cdumps/pakistan/cdump_06100109'
+# hysplitfile = 'C:/HYSPLIT/working/cdumps/india/cdump_06100109'
+hysplitfile = f'hysplit/working/cdumps/{region_of_interest}/cdump_06100109'
 
 
 def get_latlongrid_flat(dset, xindx, yindx):
@@ -29,12 +31,12 @@ def get_latlongrid_flat(dset, xindx, yindx):
     mgrid : output of numpy meshgrid function.
             Two 2d arrays of latitude, longitude.
     """
-    llcrnr_lat = dset.attrs["Concentration Grid"]["llcrnr latitude"]
-    llcrnr_lon = dset.attrs["Concentration Grid"]["llcrnr longitude"]
-    nlat = dset.attrs["Concentration Grid"]["Number Lat Points"]
-    nlon = dset.attrs["Concentration Grid"]["Number Lon Points"]
-    dlat = dset.attrs["Concentration Grid"]["Latitude Spacing"]
-    dlon = dset.attrs["Concentration Grid"]["Longitude Spacing"]
+    llcrnr_lat = dset.attrs["llcrnr latitude"]
+    llcrnr_lon = dset.attrs["llcrnr longitude"]
+    nlat = dset.attrs["Number Lat Points"]
+    nlon = dset.attrs["Number Lon Points"]
+    dlat = dset.attrs["Latitude Spacing"]
+    dlon = dset.attrs["Longitude Spacing"]
 
     lat = np.arange(llcrnr_lat, llcrnr_lat + nlat * dlat, dlat)
     lon = np.arange(llcrnr_lon, llcrnr_lon + nlon * dlon, dlon)
@@ -55,9 +57,6 @@ def get_latlongrid_flat(dset, xindx, yindx):
 my_modelbin = mio.models.hysplit.ModelBin(hysplitfile, verbose=False)
 
 
-dir(my_modelbin)
-
-
 time_period = 0
 
 my_modelbin.dset.data_vars['0001'][time_period][0].plot(x="longitude", y="latitude")
@@ -67,8 +66,8 @@ my_modelbin.dset.data_vars['006F'][time_period][0].plot(x="longitude", y="latitu
 my_modelbin.dset.data_vars['006F'][1][0].plot(x="longitude", y="latitude")
 
 
-
-
+my_modelbin.dset.attrs["Concentration Grid"]
+my_modelbin.dset.attrs['llcrnr latitude']
 
 
 all_source_xarray = my_modelbin.dset.to_array(dim='source')
@@ -76,11 +75,11 @@ sources_hexdec_index = list(my_modelbin.dset.data_vars.keys())
 
 all_source_xarray['source']
 
-int(sources_hexdec_index[60], base=16)
+int(sources_hexdec_index[2], base=16)
 
 sources_dec_index = [int(x, base=16) for x in sources_hexdec_index]
 
-with open('config_files/india/higher_res/CONTROL') as f:
+with open(f'hysplit/working/cdumps/{region_of_interest}/CONTROL') as f:
     lines = f.readlines()
 
 
@@ -95,7 +94,7 @@ sources_coords_array = np.array(sources_coords_array, dtype=np.float32)
 sources_coords_array = sources_coords_array[:,0:2 ] # remove height colmun
 sources_coords_df = pd.DataFrame(sources_coords_array, columns=['lat_source', 'lon_source'], index=sources_hexdec_index)
 
-sources_coords_df.loc['0015']
+#sources_coords_df.loc['0015']
 
 
 
@@ -132,8 +131,9 @@ def read_conc_file(conc_file_path):
 #file_name_list = ['C:/HYSPLIT/working/cdumps/cdump_' + year + '10' + '01' + '00' for year in year_list]
 
 # ten_days_length
-file_path_list = os.listdir('C:/HYSPLIT/working/cdumps/india/')
-file_path_list = [os.path.join('C:/HYSPLIT/working/cdumps/india/', x) for x in file_path_list]
+file_path_list = os.listdir(f'hysplit/working/cdumps/{region_of_interest}/')
+file_path_list = [x for x in file_path_list if x not in ['CONC.CFG', 'CONTROL', 'SETUP.CFG']]
+file_path_list = [os.path.join(f'hysplit/working/cdumps/{region_of_interest}/', x) for x in file_path_list]
 file_name_list = [os.path.basename(x) for x in file_path_list]
 start_date_list = [datetime.datetime(int('20'+file_name[6:8]), int(file_name[8:10]), int(file_name[10:12]), hour=int(file_name[12:14])) for file_name in file_name_list]
 
@@ -177,16 +177,28 @@ sys.getsizeof(conc_xarray_final)/1_000_000
 
 
 
+ lon_vals, lat_vals = get_latlongrid_flat(conc_xarray_final, conc_xarray_final.x.values, conc_xarray_final.y.values)
 
-lon_vals, lat_vals = get_latlongrid_flat(conc_xarray_final, conc_xarray_final.x.values, conc_xarray_final.y.values)
+ conc_xarray_final = conc_xarray_final.assign_coords(
+             lon=(('x'), lon_vals ),
+             lat=(('y'), lat_vals )
+     ).set_index(x = ['lon'], y = ['lat'])
 
-conc_xarray_final = conc_xarray_final.assign_coords(
-            lon=(('x'), lon_vals ),
-            lat=(('y'), lat_vals )
-    ).set_index(x = ['lon'], y = ['lat'])
+
+#conc_xarray_final = conc_xarray_final.rename({'x':'lon', 'y' :'lat'})
+
 
 
 conc_xarray_final = conc_xarray_final.rio.set_crs(rasterio.crs.CRS.from_epsg(4326), inplace = False) #
+import pyproj
+pyproj.show_versions()
+from pyproj import Proj, transform
+proj_4326 = Proj("epsg:4326")
+crs_4326 = CRS("WGS84")
+pyproj.datadir.get_data_dir()
+from pyproj import CRS
+
+crs=CRS('EPSG:4326')
 
 
 
@@ -240,6 +252,9 @@ pop_exposure_by_lonlat = pop_exposure_by_lonlat.rio.set_crs(rasterio.crs.CRS.fro
 pop_exposure_by_lonlat.rio.to_raster('data/intermed_files/pop_exposure_matrix_pakistan_with_crs.tif')
 pop_exposure_by_lonlat.rio.to_raster('data/intermed_files/pop_exposure_matrix_china_with_crs.tif')
 pop_exposure_by_lonlat.rio.to_raster('data/intermed_files/pop_exposure_matrix_india_with_crs.tif')
+pop_exposure_by_lonlat.rio.to_raster(f'data/intermed_files/pop_exposure_matrix_{region_of_interest}_deposition_with_crs.tif')
+
+
 
 pop_exposure_by_lonlat.rio.to_raster('data/intermed_files/pop_exposure_matrix_india_72h_with_crs.tif')
 pop_exposure_by_lonlat.rio.to_raster('data/intermed_files/pop_exposure_matrix_india_higher_res_with_crs.tif')
