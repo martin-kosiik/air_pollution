@@ -6,12 +6,14 @@ import xarray as xr
 import rasterio
 import rioxarray
 import matplotlib.pyplot as plt
+import dask
 #!pip install git+https://github.com/noaa-oar-arl/monetio.git
 
 os.chdir('C:/Users/marti/Dropbox/research_projects/air_pollution')
 
 region_of_interest = 'vietnam'
 region_of_interest = 'india_low_res'
+region_of_interest = 'india'
 
 import monetio as mio
 
@@ -62,12 +64,8 @@ time_period = 0
 my_modelbin.dset.data_vars['0001'][time_period][0].plot(x="longitude", y="latitude")
 
 
-my_modelbin.dset.data_vars['006F'][time_period][0].plot(x="longitude", y="latitude")
-my_modelbin.dset.data_vars['006F'][1][0].plot(x="longitude", y="latitude")
+my_modelbin.dset.data_vars['0003'][time_period][0].sum()
 
-
-my_modelbin.dset.attrs["Concentration Grid"]
-my_modelbin.dset.attrs['llcrnr latitude']
 
 
 all_source_xarray = my_modelbin.dset.to_array(dim='source')
@@ -134,9 +132,9 @@ def read_conc_file(conc_file_path):
 file_path_list = os.listdir(f'hysplit/working/cdumps/{region_of_interest}/')
 file_path_list = [x for x in file_path_list if x not in ['CONC.CFG', 'CONTROL', 'SETUP.CFG']]
 file_path_list = [os.path.join(f'hysplit/working/cdumps/{region_of_interest}/', x) for x in file_path_list]
+#file_path_list = file_path_list[0:32]
 file_name_list = [os.path.basename(x) for x in file_path_list]
 start_date_list = [datetime.datetime(int('20'+file_name[6:8]), int(file_name[8:10]), int(file_name[10:12]), hour=int(file_name[12:14])) for file_name in file_name_list]
-
 
 
 # first is 2014
@@ -150,25 +148,20 @@ conc_xarrays_list = [read_conc_file(x) for x in file_path_list]
 # conc_xarrays_list_origin = conc_xarrays_list
 
 #conc_xarrays_list = [x.chunk({'time': 'auto'}) for x in conc_xarrays_list_origin]
-#conc_xarrays_list = [x.chunk({'x': 'auto', 'y': 'auto', 'source': 'auto'}) for x in conc_xarrays_list_origin]
+#conc_xarrays_list = [x.chunk({'x': 'auto', 'y': 'auto', 'source': 'auto'}) for x in conc_xarrays_list]
 #conc_xarrays_list = [x.chunk({'source': 'auto'}) for x in conc_xarrays_list_origin]
 
-conc_xarrays_list = [x.chunk({'source': 'auto'}) for x in conc_xarrays_list]
+conc_xarrays_list = [x.chunk({'source': 1}) for x in conc_xarrays_list]
 
-
-
-
-import dask
 dask.config.set({"array.slicing.split_large_chunks": True}) 
-
-
-
 
 conc_xarray_final = xr.concat(conc_xarrays_list, pd.Index(start_date_list, name="start_date"))
 
 del conc_xarrays_list
 import gc
 gc.collect()
+
+dask.config.get('array.chunk-size')
 
 
 import sys
@@ -177,9 +170,9 @@ sys.getsizeof(conc_xarray_final)/1_000_000
 
 
 
- lon_vals, lat_vals = get_latlongrid_flat(conc_xarray_final, conc_xarray_final.x.values, conc_xarray_final.y.values)
+lon_vals, lat_vals = get_latlongrid_flat(conc_xarray_final, conc_xarray_final.x.values, conc_xarray_final.y.values)
 
- conc_xarray_final = conc_xarray_final.assign_coords(
+conc_xarray_final = conc_xarray_final.assign_coords(
              lon=(('x'), lon_vals ),
              lat=(('y'), lat_vals )
      ).set_index(x = ['lon'], y = ['lat'])
@@ -190,16 +183,6 @@ sys.getsizeof(conc_xarray_final)/1_000_000
 
 
 conc_xarray_final = conc_xarray_final.rio.set_crs(rasterio.crs.CRS.from_epsg(4326), inplace = False) #
-import pyproj
-pyproj.show_versions()
-from pyproj import Proj, transform
-proj_4326 = Proj("epsg:4326")
-crs_4326 = CRS("WGS84")
-pyproj.datadir.get_data_dir()
-from pyproj import CRS
-
-crs=CRS('EPSG:4326')
-
 
 
 #source_id = '0023'
@@ -210,18 +193,47 @@ crs=CRS('EPSG:4326')
 
 population_raster = rioxarray.open_rasterio(r'data\population_grid\ppp_2018_1km_Aggregated.tif')
 
+#population_raster_agg = rioxarray.open_rasterio(r'data\population_grid\ppp_2018_1km_Aggregated_6x.tif')
+
+
 #population_raster.plot()
 
+population_raster_cropped = population_raster.rio.clip_box(
+    minx=68.89984131,
+    miny=16.45001698,
+    maxx=88.49954224,
+    maxy=35.85009098,
+    crs="EPSG:4326",
+)
+
+
+
 # look at what exact type of resampling are you using
-pop_raster_matched = population_raster.rio.reproject_match(conc_xarray_final)
+#pop_raster_matched = population_raster.rio.reproject_match(conc_xarray_final)
+pop_raster_matched = population_raster.rio.reproject_match(conc_xarray_final, 
+                                                           resampling=rasterio.enums.Resampling.sum)
+
+
+#pop_raster_matched = population_raster_agg.rio.reproject_match(conc_xarray_final, 
+#                                                                resampling=rasterio.enums.Resampling.nearest)
+
 #pop_raster_matched.plot()
 
 pop_raster_matched_masked = pop_raster_matched.where(pop_raster_matched >-0.1)
 #pop_raster_matched_masked.plot()
 #np.log(pop_raster_matched_masked).plot()
+#population_raster_cropped_masked.plot()
+#np.log(population_raster_cropped_masked).plot()
+#np.nansum(pop_raster_matched_masked.values)
 
 
-pop_raster_matched_masked_other = xr.where(pop_raster_matched >-0.1,pop_raster_matched, 0)
+
+#pop_raster_matched_masked_other = xr.where(pop_raster_matched >-0.1,pop_raster_matched, 0)
+
+
+#np.log(pop_raster_matched_masked_other).plot()
+
+
 #conc_xarray_final
 conc_xarray_final_masked = conc_xarray_final.where(pop_raster_matched >-0.1)
 
