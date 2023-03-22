@@ -1,14 +1,17 @@
 import ee
 import os
-import geemap
+#import geemap
 
+import folium
+import eefolium
 
 import io
-from PIL import Image
+#from PIL import Image
 import branca.colormap as cmp
 
 
 def add_categorical_legend(folium_map, title, colors, labels):
+    import folium
     if len(colors) != len(labels):
         raise ValueError("colors and labels must have the same length.")
 
@@ -111,6 +114,20 @@ def add_categorical_legend(folium_map, title, colors, labels):
 
 os.chdir('C:/Users/marti/Dropbox/research_projects/air_pollution')
 
+import sys
+ 
+# adding Folder_2/subfolder to the system path
+sys.path.insert(0, '/code')
+ 
+# importing the hello
+from ee_utilities import add_categorical_legend
+from ee_utilities import hello
+import ee_utilities
+
+
+# calling hello function
+hello()
+
 # Trigger the authentication flow.
 ee.Authenticate()
 
@@ -118,8 +135,6 @@ ee.Authenticate()
 ee.Initialize()
 
 # Print metadata for a DEM dataset.
-
-import folium
 
 
 m = folium.Map(location=[45.5236, -122.6750])
@@ -146,6 +161,9 @@ import eefolium
 year = '2016'
 dataset = ee.ImageCollection('MODIS/061/MCD64A1').filter(ee.Filter.date(year+ '-09-01',str((int(year)+1))+ '-08-25'))
 burnedArea = dataset.select('BurnDate')
+
+AreaOfInterest = ee.Geometry.Rectangle([73.5,27,78,32],'EPSG:4326', False)
+
 0.0014647410716861486
 
 imageVisParam2 = {"opacity":1,"bands":["b1"],"max":0.001464119297452271,"min":0.0001823857455747202,"palette":["92a58d","0e2c80"]}
@@ -184,29 +202,30 @@ mcd12q1YrM2 = mcd12q1Yr.multiply(ee.Image.pixelArea())
 FinalImpact = burnedAreaBinary.multiply(pop_exp_b1_reproject)
 FinalImpact
 
-import folium
 
 #################################
 # 
 Map = eefolium.Map()
-Map = eefolium.Map(center=[30, 76], zoom=7.2)
+Map = eefolium.Map(center=[29.5, 76], zoom=7)
 url = 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&hl=en'
 Map.add_tile_layer(url, name='Google Maps', attribution='Google')
 
 Map.addLayer(mcd12q1Yr, croplandVis, 'Cropland', opacity=0.68)
 Map.addLayer(burnedAreaBinary, burnedAreaVis, 'Burned Area', opacity=0.75)
+Map.addLayer(AreaOfInterest, {'pallete': 'black'}, 'Output region', opacity=0.55)
 
 #palette = ['blue', 'purple', 'cyan', 'green','red']
 #Map.create_colorbar(width=250, height=30, palette=palette, vertical=False,add_labels=True, font_size=20, labels=[-40, 35])
 add_categorical_legend(Map, '',
-                             colors = ['#008000','#ff1901'],
-                           labels = ['Cropland', 'Burned area'])
+                             colors = ['black', '#008000','#ff1901'],
+                           labels = ['Area of interest', 'Cropland', 'Burned area'])
 
 
 
 img_data = Map._to_png(5)
 img = Image.open(io.BytesIO(img_data))
 img.save('figures/burned_area_folium.png')
+
 
 
 
@@ -301,3 +320,47 @@ Map.add_legend(legend_title="Burned area", legend_dict={'Cropland': '008000', 'B
 Map
 
 Map.to_image(filename='figures/map.png')
+
+
+
+
+
+def crop_images(file_name='burned_area_folium.png'):
+
+    im = Image.open(r"figures/" + file_name)
+ 
+    # Size of the image in pixels (size of original image)
+    # (This is not mandatory)
+    width, height = im.size
+ 
+# Setting the points for cropped image
+    left = round(0.18 * width)
+    top = 0 
+    right = width
+    bottom = round(0.95 * height)
+ 
+# Cropped image of above dimension
+# (It will not change original image)
+    im1 = im.crop((left, top, right, bottom))
+ 
+# Shows the image in image viewer
+    #im1.show()
+
+    im1.save('figures/cropped/' + file_name)
+
+
+
+crop_images()
+
+figures_to_crop = ['burned_area_folium.png', 'final_impact_folium.png', 
+                    'source_impact_no_interpolation_folium.png', 
+                    'source_impact_with_interpolation_folium.png']
+
+
+[crop_images(file_name=image_path) for image_path in figures_to_crop]
+
+# Setting the points for cropped image
+left = 5
+top = height / 4
+right = 164
+bottom = 3 * height / 4
