@@ -1,0 +1,111 @@
+---
+title: "Cost-benefit calculation"
+author: "Martin Kosík"
+date: '2022-12-06'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Let us consider the cost-effectivness of a conditional payment to farmers not to burn in reducing infact mortality.  
+The expected number of infant lives saved per US dollar can be expressed as
+$$ \frac{\psi \cdot \text{inf} \cdot \alpha \cdot u \cdot \phi}{c}$$
+Where $\psi$ is the percentage point increase in infant mortality per one $\mu g/m^3$ increase in 4-day concentration of PM$_{2.5}$, $\text{inf}$ is the population share of infants, $alpha$ is the emission-reduction-weighted mean source impact of the locations receiving treatment, $u$ is the total reduction in burned area due to the treatment (in hectars), $\phi$ gives us how much $\mu g$ of
+PM$_{2.5}$ emissions mass will one hectar of burned area release, and $c$ are the total costs of the intervention per US dollar.
+
+We can obtain an estimate of $\frac{u}{c} = \frac{1}{88.92}$ from the RCT of Jayachandran et al. (2022) as they report that the cost of per hectar reduction in burned area in their experiment was INR 4051.3 (2700 in less conservative spec.) per acre, which is approximately 125 (88.92) USD per hectar.
+ 
+
+```{r cars}
+#source 
+# https://web.stanford.edu/~mburke/papers/HeftNealBurneyBendavidBurke2018.pdf
+# Extended Data Table 1 - linear model (1)
+infat_mortality_increase <- 0.000656
+
+# Alternatively we can use https://eartharxiv.org/repository/view/3265/ instead
+# PM2.5 increase in the upwind direction of burned biomass (Extended Data Fig 7. - 0-30km )
+pm2.5_increase <- 0.45
+infat_mortality_increase_burned_area <- 0.00096
+
+infat_mortality_increase <- infat_mortality_increase_burned_area/pm2.5_increase
+
+
+alpha <- 0.001
+alpha <- 0.0006
+alpha <- 0.20
+
+
+
+
+# 1 hectare = 2.47105381 acres
+
+# 2700 IBR per acre
+# 75 INR = 1 USD
+infant_share <- 25/1393
+phi <- 3774 * 1.5 * 0.86 * 0.67 * 6.26
+phi <- 3774 * 1.5 * 0.86 * 0.67 * 5.1
+
+#Crop yield in kg/ha
+cy <- 3774
+
+# Residue-to-crop weight ratio (unitless)
+rc <- 1.5
+
+
+# Dry matter fraction of the crop
+
+f_dm <- 0.85
+
+# Combustion completeness (fraction of the dry matter burned)
+f_cc <- 0.67
+
+# Emission factor (g of species per kg of dry matter)
+ef <- 5.1
+
+phi <- 2500 * 1.5 * 0.86 * 0.67 * 5.1
+
+# phi in g of species per ha of crop
+phi_g_per_ha <- 2500 * 1.5 * 0.86 * 0.67 * 5.1
+phi_g_per_ha <- cy * rc * f_dm * f_cc * ef
+
+# phi in micrograms of species per ha of crop
+phi <- phi_g_per_ha 
+
+#costs_in_inr_per_unburned_acre <- 4051.3
+
+#costs_of_per_km2_reduction_in_burned_area <- costs_in_inr_per_unburned_acre/75 * 2.47 *100
+costs_of_per_ha_reduction_in_burned_area <- 4051.3/80 * 2.47
+
+
+how_many_infants_we_save_per_dollar <- (infat_mortality_increase * infant_share * phi *alpha )/( costs_of_per_ha_reduction_in_burned_area *10)
+
+1/how_many_infants_we_save_per_dollar
+
+```
+
+
+According to Puulabholtla paper 1 km2 increase in infant mortality leads to 0.001 increase in infant mortality in downwind direction (within 30 km radius) and 0.5 micrograms per m3 increase in monthly PM2.5 conentration
+
+1hectare is 0.01 km2
+
+```{r pressure, echo=FALSE}
+costs_of_per_km2_reduction_in_burned_area <- 2700/75 * 2.47 *100
+
+```
+
+```{r}
+infants_within_30km_downwind <- 25/1393 *200000
+infant_mort_increase_per_km2_burned <- 0.001
+
+
+how_many_infants_we_save_per_dollar_alt <- (infant_mort_increase_per_km2_burned*infants_within_30km_downwind)/costs_of_per_km2_reduction_in_burned_area
+
+1/how_many_infants_we_save_per_dollar_alt
+
+#33337 dollars to save one life with malaria bednets 
+```
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
