@@ -53,7 +53,6 @@ def get_latlongrid_flat(dset, xindx, yindx):
 
 
 
-#my_modelbin = mio.models.hysplit.ModelBin(hysplitfile, verbose=False)
 
 
 my_modelbin = mio.models.hysplit.ModelBin(hysplitfile, verbose=False)
@@ -92,7 +91,6 @@ sources_coords_array = np.array(sources_coords_array, dtype=np.float32)
 sources_coords_array = sources_coords_array[:,0:2 ] # remove height colmun
 sources_coords_df = pd.DataFrame(sources_coords_array, columns=['lat_source', 'lon_source'], index=sources_hexdec_index)
 
-#sources_coords_df.loc['0015']
 
 
 
@@ -185,15 +183,9 @@ conc_xarray_final = conc_xarray_final.assign_coords(
 conc_xarray_final = conc_xarray_final.rio.set_crs(rasterio.crs.CRS.from_epsg(4326), inplace = False) #
 
 
-#source_id = '0023'
-
-#np.log(conc_xarray_final.sel(source=source_id, time=slice(0, None)).fillna(0).mean(dim='start_date').mean(dim='time')).plot()
-
 
 
 population_raster = rioxarray.open_rasterio(r'data\population_grid\ppp_2018_1km_Aggregated.tif')
-
-#population_raster_agg = rioxarray.open_rasterio(r'data\population_grid\ppp_2018_1km_Aggregated_6x.tif')
 
 
 #population_raster.plot()
@@ -231,10 +223,8 @@ pop_raster_matched_masked = pop_raster_matched.where(pop_raster_matched >-0.1)
 #pop_raster_matched_masked_other = xr.where(pop_raster_matched >-0.1,pop_raster_matched, 0)
 
 
-#np.log(pop_raster_matched_masked_other).plot()
 
 
-#conc_xarray_final
 conc_xarray_final_masked = conc_xarray_final.where(pop_raster_matched >-0.1)
 
 
@@ -242,12 +232,12 @@ conc_xarray_final_masked = conc_xarray_final.where(pop_raster_matched >-0.1)
 pop_exposure_matrix = conc_xarray_final_masked.fillna(0).mean(dim='start_date').mean(dim='time').dot(pop_raster_matched_masked.fillna(0), dims = ['x', 'y'])
 
 
-pop_exposure_matrix.to_netcdf("data/intermed_files/pop_exposure_matrix_pakistan.nc")
-pop_exposure_matrix.to_netcdf("data/intermed_files/pop_exposure_matrix_india.nc")
+#pop_exposure_matrix.to_netcdf("data/intermed_files/pop_exposure_matrix_pakistan.nc")
+#pop_exposure_matrix.to_netcdf("data/intermed_files/pop_exposure_matrix_india.nc")
 
 
-pop_exposure_matrix = xr.open_dataarray("data/intermed_files/pop_exposure_matrix_china.nc")
-pop_exposure_matrix = xr.open_dataarray("data/intermed_files/pop_exposure_matrix_india.nc")
+#pop_exposure_matrix = xr.open_dataarray("data/intermed_files/pop_exposure_matrix_china.nc")
+#pop_exposure_matrix = xr.open_dataarray("data/intermed_files/pop_exposure_matrix_india.nc")
 
 
 #pop_exposure_matrix.isel(band=0).set_index(source=['lon_source', 'lat_source'],).unstack("source").plot(x='lon_source', y='lat_source')
@@ -271,6 +261,22 @@ pop_exposure_by_lonlat.rio.to_raster(f'data/intermed_files/pop_exposure_matrix_{
 pop_exposure_by_lonlat.rio.to_raster('data/intermed_files/pop_exposure_matrix_india_72h_with_crs.tif')
 pop_exposure_by_lonlat.rio.to_raster('data/intermed_files/pop_exposure_matrix_india_higher_res_with_crs.tif')
 
+
+
+for year in range(2006, 2020):
+     print(year)
+
+     dates_to_select = [f'{year}-10-01T09:00:00.000000000', f'{year}-10-07T09:00:00.000000000',
+                   f'{year}-10-12T09:00:00.000000000', f'{year}-10-20T09:00:00.000000000',]
+
+     pop_exposure_matrix_year = conc_xarray_final_masked.fillna(0).sel(start_date = dates_to_select).mean(dim='start_date').mean(dim='time').dot(pop_raster_matched_masked.fillna(0), dims = ['x', 'y'])
+
+     pop_exposure_by_lonlat = pop_exposure_matrix_year.isel(band=0).set_index(source=['lon_source', 'lat_source'],).unstack("source")
+
+     pop_exposure_by_lonlat = pop_exposure_by_lonlat.transpose('lat_source', 'lon_source')
+     pop_exposure_by_lonlat = pop_exposure_by_lonlat.rio.set_spatial_dims(x_dim = 'lon_source', y_dim='lat_source', inplace=False)
+     pop_exposure_by_lonlat = pop_exposure_by_lonlat.rio.set_crs(rasterio.crs.CRS.from_epsg(4326), inplace = False) #
+     pop_exposure_by_lonlat.rio.to_raster(f'data/intermed_files/pop_exposure_by_year/pop_exposure_matrix_{region_of_interest}_deposition_with_crs_{year}.tif')
 
 
 del pop_raster_matched_masked
