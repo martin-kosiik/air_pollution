@@ -111,13 +111,24 @@ plt.savefig("figures/exp_inf_deaths_interpolated.png")
 
 
 
+burned_area_1 = rioxarray.open_rasterio("data/burned_area/MCD64A1.061_Burn_Date_doy2016275_aid0001.tif") 
+burned_area_2 = rioxarray.open_rasterio("data/burned_area/MCD64A1.061_Burn_Date_doy2016306_aid0001.tif") 
 
-burned_area = rioxarray.open_rasterio("data/burned_area/MCD64A1.006_Burn_Date_doy2019274_aid0001 (1).tif") 
+
+burned_area_2.rio.crs == burned_area_1.rio.crs
+
+
 #burned_area = burned_area.rio.set_crs(rasterio.crs.CRS.from_epsg(4326), inplace = False) #
-burned_area = (burned_area > 0)*1
+burned_area_1 = (burned_area_1 > 0)*1
+burned_area_2 = (burned_area_2 > 0)*1
+
+burned_area = xr.where(burned_area_1 > burned_area_2, burned_area_1, burned_area_2, 
+                       keep_attrs=True)
+
+burned_area = burned_area.rio.set_crs(burned_area_1.rio.crs, inplace = False) #
+
 
 burned_area_reproject = burned_area.rio.reproject(rasterio.crs.CRS.from_epsg(4326))
-
 
 
 burned_area_matched = burned_area_reproject.rio.reproject_match(population_raster_cropped, 
@@ -126,7 +137,7 @@ burned_area_matched = burned_area_reproject.rio.reproject_match(population_raste
 
 burned_area_matched = (burned_area_matched > 0)*1
 
-
+burned_area_matched.plot()
 
 hysplit_pop_exposure_matched_masked = hysplit_pop_exposure_matched.where(burned_area_matched >0)
 radius_pop_exposure_matched_masked = radius_pop_exposure_matched.where(burned_area_matched >0)
