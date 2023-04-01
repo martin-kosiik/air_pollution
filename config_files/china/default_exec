@@ -1,0 +1,34 @@
+#Starting_locations
+plants.txt
+#Help_file_dir
+C:/HYSPLIT/html
+#Exec_files_dir
+C:/HYSPLIT/exec
+#Xwindows_dir
+
+#Image_Magick_pgm
+C:/ImageMagick/convert.exe
+#Zip_pgm
+C:/HYSPLIT/exec/zip.exe
+#Home_dir
+C:/HYSPLIT
+#Metdata_dir
+C:/HYSPLIT/working
+#Ghostview_pgm
+C:/Program Files/Ghostgum/gsview/gsview64.exe
+#Ghostscript_pgm
+C:/Program Files/gs/gs9.52/bin/gswin64.exe
+#Tcl_source_dir
+C:/HYSPLIT/guicode
+#Mapping_dir
+C:/HYSPLIT/graphics
+#Fixed_files_dir
+C:/HYSPLIT/bdyfiles
+#Cluster_directory
+C:/HYSPLIT/cluster
+#Working_directory
+C:/HYSPLIT/working
+#Anaconda3_env
+C:/Users/marti/AppData/Local/Continuum/anaconda3/envs/hysplit
+#PyPreferred
+false
