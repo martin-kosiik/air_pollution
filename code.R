@@ -1,5 +1,6 @@
 #install.packages('splitr')
 #install.packages("here")
+library(usethis)
 
 #library(installr)
 library(here)
@@ -7,6 +8,8 @@ library(lubridate)
 #install.Rtools()
 library(tidyverse)
 library(raster)
+
+setwd(here::here())
 
 library(sf)
 library(mapview)
@@ -34,8 +37,8 @@ source('my_functions.R')
 
 
 
-
-
+# Readin village shapefiles
+##################################
 
 
 read_shapefile <- function(zipfile){
@@ -58,8 +61,6 @@ village_map_pb <- read_shapefile(pb_map_path)
 
 
 
-#village_map_hr <- sf::read_sf("data\\india_2001_census_map\\all_india\\all_india_village_level_map.shp")
-
 
 # trims particles that are above the global max boundary value
 #disp_df_trim <- disp_df[height <= 2665]
@@ -76,7 +77,8 @@ village_map_hr <- village_map_hr %>%
 
 sf::sf_use_s2(FALSE)
 
-#(village_map_hr$particle_count <- lengths(st_intersects(village_map_hr, dispersion_sf$geometry)))
+
+village_map_hr$area_km2 <- st_area(village_map_hr$geometry)/1000
 
 
 
@@ -98,6 +100,10 @@ ggplot(data = village_map_hr) +
 #♦scale_fill_viridis_c(option = "magma")
 
 
+######################################################################
+
+
+# Reading the population grid
 
 pop_grid <- raster("data\\population_grid\\india-spatial-india-census-2011-population-grid\\india_pop\\w001001.adf") 
 
@@ -127,12 +133,8 @@ fires_count <- rasterize(fires, pop_grid_crop_dis, fun='count', field = 'FRP')
 plot(fires_count)
 
 
-village_map_hr$area_km2 <- st_area(village_map_hr$geometry)/1000
+##################
 
-village_map_hr <- village_map_hr %>% 
-  st_transform(crs = 4326)
-
-sf::sf_use_s2(FALSE)
 
 
 get_disp_tables <- function(date_time = "2014-10-01 00:00"){
@@ -140,7 +142,8 @@ get_disp_tables <- function(date_time = "2014-10-01 00:00"){
     create_dispersion_model() %>%
     add_source(
       name = "particle",
-      lat = 30, lon = 77, height = 50, 
+    #  lat = 30, lon = 77, height = 50, 
+    lat = 31, lon = 75, height = 50, 
       rate = 5, pdiam = 1.1, density = 2, shape_factor = 0.8,
       release_start = lubridate::ymd_hm(date_time),
       release_end = lubridate::ymd_hm(date_time) + lubridate::hours(1)  
@@ -179,22 +182,15 @@ disp_tables_list_after_day <- disp_tables_list %>%
   bind_rows(.id = 'date_of_emission')
 
 
-# 
-# disp_tables_list_after_day <- disp_tables_list %>% 
-#   map(~ . %>%   
-#         group_by(particle_i) %>% 
-#         mutate(reached_zero_height = cumsum(height == 0),
-#               # reached_above_pbl = cumsum(height > 2665)
-#                )%>%
-#         ungroup() %>% 
-#         mutate(reached_zero_height = (reached_zero_height > 0) *1,
-#                #reached_above_pbl = (reached_above_pbl > 0) *1,
-#                above_pbl = (height > 2665) * 1 )
-#   )
+disp_tables_list_after_day %>% 
+  write_csv('particle_simulations/default_sim.csv')
+  
 
+disp_tables_list_after_day %>% 
+  write_csv('particle_simulations/alt_sim.csv')
 
-#disp_tables_list_after_day <- disp_tables_list %>% 
-#  map(~ filter(., height !=0, height < 2665))
+disp_tables_list_after_day <- read_csv('particle_simulations/alt_sim.csv')
+
 
 
 disp_tables_list_after_day <- disp_tables_list_after_day %>% 
@@ -213,16 +209,76 @@ disp_tables_list_after_day <- disp_tables_list_after_day %>%
 
 
 
-get_particle_count <- function(dispersion_vec = disp_tables_list_after_day[[1]]){
+
+
+plot(cell_size)
+
+res(pop_grid_crop_dis)
+# https://gis.stackexchange.com/questions/309407/computing-number-of-points-in-a-raster-grid-cell-in-r
+
+dispersion_vec_new <- disp_tables_list_after_day %>%  mutate(date_of_emission = as.character(date_of_emission)) %>%  filter(date_of_emission == '2014-10-01 00:00')
+
+dispersion_vec_new <- disp_tables_list_after_day %>%  filter(date_of_emission ==  ymd_hms('2014-10-01 00:00:00'))
+
+
+disp_tables_list_after_day %>% count(date_of_emission)
+
+dispersion_sf_new <- st_as_sf(dispersion_vec_new, coords = c("lon", "lat"), crs = 4326)
+
+
+particle_count_new <- rasterize(dispersion_sf_new, pop_grid_crop_dis, fun='count', field = 'particle_i')
+
+plot(particle_count)
+cell_size<-area(pop_grid_crop_dis, weights=FALSE, na.rm = T)
+
+plot(particle_count/cell_size)
+
+get_particle_count_raster <- function(selected_date_of_emission = '2014-10-01 00:00',
+                                      cell_area = cell_size, raster_to_use = pop_grid_crop_dis){
+  
+  dispersion_vec <- disp_tables_list_after_day %>% filter(date_of_emission == ymd_hm(selected_date_of_emission))
   
   dispersion_sf <- st_as_sf(dispersion_vec, coords = c("lon", "lat"), crs = 4326)
   
-  particle_count <- lengths(st_intersects(village_map_hr, dispersion_sf$geometry))
+  particle_count <- rasterize(dispersion_sf, pop_grid_crop_dis, fun='count', field = 'particle_i')
   
-  part_count_per_ha <- particle_count/village_map_hr$AREA
+  part_count_per_km2 <- particle_count/cell_area
   
-  return(part_count_per_ha)
+  return(part_count_per_km2)
 }
+
+
+get_particle_count_raster()
+
+disp_rasters_list <- dates_of_emission %>% 
+  map(get_particle_count_raster)
+
+
+disp_raster_stack <- stack(disp_rasters_list)
+disp_raster_brick <- brick(disp_rasters_list)
+
+mean_disp_raster <- calc(disp_raster_brick, fun = mean, na.rm = T)
+
+
+plot(disp_raster_brick)
+plot(mean_disp_raster)
+
+
+pop_w_disp_raster <- (mean_disp_raster*pop_grid_crop_dis)/cellStats(pop_grid_crop_dis, stat = 'sum')
+
+plot(pop_w_disp_raster)
+
+cellStats(pop_w_disp_raster, stat = 'sum')
+# 2.037228
+# 1.39291
+1.39291/2.037228
+2.037228/1.39291
+
+######################
+ 
+# Village-level
+###########################
+
 
 get_particle_count <- function(selected_date_of_emission = '2014-10-01 00:00'){
   
@@ -238,7 +294,6 @@ get_particle_count <- function(selected_date_of_emission = '2014-10-01 00:00'){
 }
 
 
-get_particle_count()
 
 disp_tables_df <- dates_of_emission %>% 
   map_dfc(get_particle_count)
@@ -261,8 +316,6 @@ names(village_map_hr)
 
 village_map_hr <- village_map_hr %>% 
   mutate(part_count_per_ha_mean = (part_count_per_ha_1 + part_count_per_ha_2 + part_count_per_ha_3+ part_count_per_ha_4 + part_count_per_ha_5)/5) 
-
-names(village_map_hr)
 
 drop_units(village_map_hr$part_count_per_ha_mean)
 
